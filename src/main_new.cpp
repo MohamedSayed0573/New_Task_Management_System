@@ -293,261 +293,192 @@ public:
     }
 
     int run(int argc, char* argv[]) {
-        // Create the main CLI app with enhanced description
-        CLI::App app{ "📋 To-Do List Manager v2.0 - Enhanced Edition" };
+        // Create the main CLI app
+        CLI::App app{ "To-Do List Manager v2.0 - A powerful, modern task management system" };
 
-        // Enhanced app description
-        app.description("\n🎯 A powerful, modern task management system built with C++20/23\n"
-            "   Efficiently organize, track, and manage your tasks with advanced features\n"
-            "   including priorities, due dates, tags, and comprehensive search capabilities.\n");
+        // Set up global options
+        app.add_option("--data-file", config_.data_file, "Path to the data file")
+            ->check(CLI::ExistingPath | CLI::NonexistentPath);
 
-        // Set up global options with enhanced descriptions
-        app.add_option("--data-file", config_.data_file,
-            "📁 Specify custom data file path (default: data/data.json)")
-            ->type_name("PATH")
-            ->check(CLI::ExistingPath | CLI::NonexistentPath)
-            ->group("Configuration");
+        app.add_flag("-v,--verbose", config_.verbose, "Enable verbose output");
+        app.add_flag("-q,--quiet", config_.quiet, "Suppress non-essential output");
 
-        app.add_flag("-v,--verbose", config_.verbose,
-            "🔍 Enable detailed output for debugging")
-            ->group("Output Control");
+        // Set up help and version
+        app.set_version_flag("--version", [this]() { handleVersionCommand(); }, "Show version information");
 
-        app.add_flag("-q,--quiet", config_.quiet,
-            "🤫 Suppress non-essential output (minimal mode)")
-            ->group("Output Control");
+        // Add footer with examples
+        app.footer("Examples:\n"
+            "  todo add \"Buy groceries\" --priority high --due 2024-12-31\n"
+            "  todo list --filter completed\n"
+            "  todo search \"grocery\"\n"
+            "  todo complete 1\n\n"
+            "For more help on a specific command, use: todo <command> --help");
 
-        // Enhanced version information
-        app.set_version_flag("--version",
-            "📌 To-Do List Manager v2.0.0 Enhanced Edition\n"
-            "   Built with C++20/23 and CLI11\n"
-            "   Copyright © 2024 - Modern Task Management System",
-            "Show detailed version information");
-
-        // Enhanced footer with comprehensive examples and usage patterns
-        app.footer("\n📚 COMPREHENSIVE EXAMPLES:\n"
-            "  ┌─ Basic Task Management\n"
-            "  │  todo add \"Buy groceries\" --priority high --due 2024-12-31\n"
-            "  │  todo add \"Write report\" -p medium -d \"Quarterly analysis\" -t work,urgent\n"
-            "  │  todo complete 1\n"
-            "  │  todo update 2 \"Updated task name\" inprogress medium\n"
-            "  │  todo remove 3\n"
-            "  │\n"
-            "  ┌─ Viewing and Filtering\n"
-            "  │  todo list                    # Show all tasks\n"
-            "  │  todo list completed          # Show only completed tasks\n"
-            "  │  todo list high              # Show high priority tasks\n"
-            "  │  todo overdue                # Show overdue tasks\n"
-            "  │  todo stats                  # Task statistics\n"
-            "  │\n"
-            "  ┌─ Search and Details\n"
-            "  │  todo search \"grocery\"        # Find tasks containing 'grocery'\n"
-            "  │  todo detail 5               # Show detailed info for task 5\n"
-            "  │\n"
-            "  ┌─ Tags and Due Dates\n"
-            "  │  todo tag 1 urgent           # Add 'urgent' tag to task 1\n"
-            "  │  todo untag 1 urgent         # Remove 'urgent' tag from task 1\n"
-            "  │  todo due 2 2024-12-25       # Set due date for task 2\n"
-            "\n"
-            "💡 TIPS:\n"
-            "   • Use quotes for task names with spaces\n"
-            "   • Date format: YYYY-MM-DD (e.g., 2024-12-31)\n"
-            "   • Valid priorities: low, medium, high\n"
-            "   • Valid statuses: todo, inprogress, completed\n"
-            "   • Multiple tags: -t tag1,tag2,tag3\n"
-            "\n"
-            "🆘 For detailed help on any command: todo <command> --help\n"
-            "📖 For help on all commands: todo --help-all\n");
-
-        // Configure enhanced help formatting
-        app.set_help_all_flag("--help-all", "📖 Show comprehensive help for all commands");
-
-        // Set custom help formatter for better appearance
-        app.get_formatter()->column_width(35);
+        // Configure help
+        app.set_help_all_flag("--help-all", "Show help for all commands");
 
         // Require at least one subcommand or show help
         app.require_subcommand(1);
 
-        // ✅ ADD command - Create new tasks
-        auto* add_cmd = app.add_subcommand("add", "✅ Create a new task with optional properties");
-        add_cmd->group("Task Management");
+        // ADD command
+        auto* add_cmd = app.add_subcommand("add", "Add a new task");
+        {
+            std::string name, status = "todo", priority = "low", description, due_date;
+            std::vector<std::string> tags;
 
-        // Declare variables outside the scope block to ensure proper lifetime
-        std::string add_name, add_status = "todo", add_priority = "low", add_description, add_due_date;
-        std::vector<std::string> add_tags;
+            add_cmd->add_option("name", name, "Task name")->required();
+            add_cmd->add_option("-s,--status", status, "Task status")
+                ->check(CLI::IsMember({ "todo", "inprogress", "completed" }));
+            add_cmd->add_option("-p,--priority", priority, "Task priority")
+                ->check(CLI::IsMember({ "low", "medium", "high" }));
+            add_cmd->add_option("-d,--description", description, "Task description");
+            add_cmd->add_option("--due", due_date, "Due date (YYYY-MM-DD)");
+            add_cmd->add_option("-t,--tags", tags, "Tags for the task");
 
-        add_cmd->add_option("name", add_name, "📝 Task name or description")->required()
-            ->type_name("TEXT");
-        add_cmd->add_option("-s,--status", add_status, "📊 Initial task status")
-            ->check(CLI::IsMember({ "todo", "inprogress", "completed" }))
-            ->type_name("STATUS")
-            ->default_str("todo");
-        add_cmd->add_option("-p,--priority", add_priority, "⚡ Task priority level")
-            ->check(CLI::IsMember({ "low", "medium", "high" }))
-            ->type_name("PRIORITY")
-            ->default_str("low");
-        add_cmd->add_option("-d,--description", add_description, "📄 Detailed task description")
-            ->type_name("TEXT");
-        add_cmd->add_option("--due", add_due_date, "📅 Due date (YYYY-MM-DD format)")
-            ->type_name("DATE");
-        add_cmd->add_option("-t,--tags", add_tags, "🏷️  Task tags (comma-separated)")
-            ->type_name("TAG1,TAG2,...");
+            add_cmd->callback([=]() {
+                handleAddCommand(name, status, priority, description, due_date, tags);
+                });
+        }
 
-        add_cmd->callback([this, &add_name, &add_status, &add_priority, &add_description, &add_due_date, &add_tags]() {
-            handleAddCommand(add_name, add_status, add_priority, add_description, add_due_date, add_tags);
-            });
-
-        // 📋 LIST command - Display tasks
-        auto* list_cmd = app.add_subcommand("list", "📋 Display tasks with optional filtering");
+        // LIST command
+        auto* list_cmd = app.add_subcommand("list", "List tasks");
         list_cmd->alias("ls");
-        list_cmd->group("Task Management");
+        {
+            std::string filter;
+            list_cmd->add_option("filter", filter, "Filter tasks")
+                ->check(CLI::IsMember({ "todo", "inprogress", "completed", "low", "medium", "high", "overdue" }));
 
-        std::string list_filter;
-        list_cmd->add_option("filter", list_filter, "🔍 Filter by status or priority")
-            ->check(CLI::IsMember({ "todo", "inprogress", "completed", "low", "medium", "high", "overdue" }))
-            ->type_name("FILTER");
+            list_cmd->callback([=]() {
+                handleListCommand(filter);
+                });
+        }
 
-        list_cmd->callback([this, &list_filter]() {
-            handleListCommand(list_filter);
-            });
+        // UPDATE command
+        auto* update_cmd = app.add_subcommand("update", "Update an existing task");
+        {
+            int id;
+            std::string name, status, priority;
 
-        // 🔄 UPDATE command - Modify existing tasks
-        auto* update_cmd = app.add_subcommand("update", "🔄 Modify an existing task's properties");
-        update_cmd->group("Task Management");
+            update_cmd->add_option("id", id, "Task ID")->required()->check(CLI::PositiveNumber);
+            update_cmd->add_option("name", name, "New task name")->required();
+            update_cmd->add_option("status", status, "New status")
+                ->required()
+                ->check(CLI::IsMember({ "todo", "inprogress", "completed" }));
+            update_cmd->add_option("priority", priority, "New priority")
+                ->required()
+                ->check(CLI::IsMember({ "low", "medium", "high" }));
 
-        int update_id;
-        std::string update_name, update_status, update_priority;
+            update_cmd->callback([=]() {
+                handleUpdateCommand(id, name, status, priority);
+                });
+        }
 
-        update_cmd->add_option("id", update_id, "🆔 Task ID to update")->required()
-            ->check(CLI::PositiveNumber)->type_name("ID");
-        update_cmd->add_option("name", update_name, "📝 New task name")->required()
-            ->type_name("TEXT");
-        update_cmd->add_option("status", update_status, "📊 New task status")->required()
-            ->check(CLI::IsMember({ "todo", "inprogress", "completed" }))
-            ->type_name("STATUS");
-        update_cmd->add_option("priority", update_priority, "⚡ New task priority")->required()
-            ->check(CLI::IsMember({ "low", "medium", "high" }))
-            ->type_name("PRIORITY");
-
-        update_cmd->callback([this, &update_id, &update_name, &update_status, &update_priority]() {
-            handleUpdateCommand(update_id, update_name, update_status, update_priority);
-            });
-
-        // 🗑️ REMOVE command - Delete tasks
-        auto* remove_cmd = app.add_subcommand("remove", "🗑️  Delete a task permanently");
+        // REMOVE command
+        auto* remove_cmd = app.add_subcommand("remove", "Remove a task");
         remove_cmd->alias("rm");
         remove_cmd->alias("delete");
-        remove_cmd->group("Task Management");
+        {
+            int id;
+            remove_cmd->add_option("id", id, "Task ID to remove")->required()->check(CLI::PositiveNumber);
 
-        int remove_id;
-        remove_cmd->add_option("id", remove_id, "🆔 Task ID to remove")->required()
-            ->check(CLI::PositiveNumber)->type_name("ID");
+            remove_cmd->callback([=]() {
+                handleRemoveCommand(id);
+                });
+        }
 
-        remove_cmd->callback([this, &remove_id]() {
-            handleRemoveCommand(remove_id);
-            });
-
-        // 🔍 SEARCH command - Find tasks
-        auto* search_cmd = app.add_subcommand("search", "🔍 Find tasks by name, description, or tags");
+        // SEARCH command
+        auto* search_cmd = app.add_subcommand("search", "Search tasks");
         search_cmd->alias("find");
-        search_cmd->group("Information");
+        {
+            std::string query;
+            search_cmd->add_option("query", query, "Search query")->required();
 
-        std::string search_query;
-        search_cmd->add_option("query", search_query, "🎯 Search terms or keywords")->required()
-            ->type_name("TEXT");
+            search_cmd->callback([=]() {
+                handleSearchCommand(query);
+                });
+        }
 
-        search_cmd->callback([this, &search_query]() {
-            handleSearchCommand(search_query);
-            });
-
-        // 📖 DETAIL command - Show task information
-        auto* detail_cmd = app.add_subcommand("detail", "📖 Show comprehensive task information");
+        // DETAIL command
+        auto* detail_cmd = app.add_subcommand("detail", "Show task details");
         detail_cmd->alias("show");
         detail_cmd->alias("info");
-        detail_cmd->group("Information");
+        {
+            int id;
+            detail_cmd->add_option("id", id, "Task ID")->required()->check(CLI::PositiveNumber);
 
-        int detail_id;
-        detail_cmd->add_option("id", detail_id, "🆔 Task ID to display")->required()
-            ->check(CLI::PositiveNumber)->type_name("ID");
+            detail_cmd->callback([=]() {
+                handleDetailCommand(id);
+                });
+        }
 
-        detail_cmd->callback([this, &detail_id]() {
-            handleDetailCommand(detail_id);
-            });
-
-        // ✅ COMPLETE command - Mark as done
-        auto* complete_cmd = app.add_subcommand("complete", "✅ Mark a task as completed");
+        // COMPLETE command
+        auto* complete_cmd = app.add_subcommand("complete", "Mark task as completed");
         complete_cmd->alias("done");
-        complete_cmd->group("Task Management");
+        {
+            int id;
+            complete_cmd->add_option("id", id, "Task ID")->required()->check(CLI::PositiveNumber);
 
-        int complete_id;
-        complete_cmd->add_option("id", complete_id, "🆔 Task ID to complete")->required()
-            ->check(CLI::PositiveNumber)->type_name("ID");
+            complete_cmd->callback([=]() {
+                handleCompleteCommand(id);
+                });
+        }
 
-        complete_cmd->callback([this, &complete_id]() {
-            handleCompleteCommand(complete_id);
-            });
+        // TAG command
+        auto* tag_cmd = app.add_subcommand("tag", "Add tag to task");
+        {
+            int id;
+            std::string tag;
+            tag_cmd->add_option("id", id, "Task ID")->required()->check(CLI::PositiveNumber);
+            tag_cmd->add_option("tag", tag, "Tag to add")->required();
 
-        // 🏷️ TAG command - Add tags
-        auto* tag_cmd = app.add_subcommand("tag", "🏷️  Add a tag to a task for organization");
-        tag_cmd->group("Organization");
+            tag_cmd->callback([=]() {
+                handleTagCommand(id, tag);
+                });
+        }
 
-        int tag_id;
-        std::string tag_name;
-        tag_cmd->add_option("id", tag_id, "🆔 Task ID to tag")->required()
-            ->check(CLI::PositiveNumber)->type_name("ID");
-        tag_cmd->add_option("tag", tag_name, "🏷️  Tag name to add")->required()
-            ->type_name("TAG");
+        // UNTAG command
+        auto* untag_cmd = app.add_subcommand("untag", "Remove tag from task");
+        {
+            int id;
+            std::string tag;
+            untag_cmd->add_option("id", id, "Task ID")->required()->check(CLI::PositiveNumber);
+            untag_cmd->add_option("tag", tag, "Tag to remove")->required();
 
-        tag_cmd->callback([this, &tag_id, &tag_name]() {
-            handleTagCommand(tag_id, tag_name);
-            });
+            untag_cmd->callback([=]() {
+                handleUntagCommand(id, tag);
+                });
+        }
 
-        // 🏷️❌ UNTAG command - Remove tags
-        auto* untag_cmd = app.add_subcommand("untag", "🏷️❌ Remove a tag from a task");
-        untag_cmd->group("Organization");
-
-        int untag_id;
-        std::string untag_name;
-        untag_cmd->add_option("id", untag_id, "🆔 Task ID to untag")->required()
-            ->check(CLI::PositiveNumber)->type_name("ID");
-        untag_cmd->add_option("tag", untag_name, "🏷️  Tag name to remove")->required()
-            ->type_name("TAG");
-
-        untag_cmd->callback([this, &untag_id, &untag_name]() {
-            handleUntagCommand(untag_id, untag_name);
-            });
-
-        // 📅 DUE command - Set due dates
-        auto* due_cmd = app.add_subcommand("due", "📅 Set or update task due date");
+        // DUE command
+        auto* due_cmd = app.add_subcommand("due", "Set task due date");
         due_cmd->alias("deadline");
-        due_cmd->group("Organization");
+        {
+            int id;
+            std::string date;
+            due_cmd->add_option("id", id, "Task ID")->required()->check(CLI::PositiveNumber);
+            due_cmd->add_option("date", date, "Due date (YYYY-MM-DD)")->required();
 
-        int due_id;
-        std::string due_date;
-        due_cmd->add_option("id", due_id, "🆔 Task ID to set due date")->required()
-            ->check(CLI::PositiveNumber)->type_name("ID");
-        due_cmd->add_option("date", due_date, "📅 Due date (YYYY-MM-DD)")->required()
-            ->type_name("DATE");
+            due_cmd->callback([=]() {
+                handleDueDateCommand(id, date);
+                });
+        }
 
-        due_cmd->callback([this, &due_id, &due_date]() {
-            handleDueDateCommand(due_id, due_date);
-            });
-
-        // 📊 STATS command - Show statistics
-        auto* stats_cmd = app.add_subcommand("stats", "📊 Display comprehensive task statistics");
+        // STATS command
+        auto* stats_cmd = app.add_subcommand("stats", "Show task statistics");
         stats_cmd->alias("statistics");
-        stats_cmd->group("Information");
+        {
+            stats_cmd->callback([=]() {
+                handleStatsCommand();
+                });
+        }
 
-        stats_cmd->callback([this]() {
-            handleStatsCommand();
-            });
-
-        // ⚠️ OVERDUE command - Show overdue tasks
-        auto* overdue_cmd = app.add_subcommand("overdue", "⚠️  Show tasks that are past their due date");
-        overdue_cmd->group("Information");
-
-        overdue_cmd->callback([this]() {
-            handleOverdueCommand();
-            });
+        // OVERDUE command
+        auto* overdue_cmd = app.add_subcommand("overdue", "Show overdue tasks");
+        {
+            overdue_cmd->callback([=]() {
+                handleOverdueCommand();
+                });
+        }
 
         // Reload Tasks with the possibly changed data file
         if (config_.data_file != "data/data.json") {

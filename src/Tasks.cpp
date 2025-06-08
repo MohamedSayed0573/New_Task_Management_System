@@ -267,8 +267,6 @@ void Tasks::showAllTasks() const {
     const int priorityWidth = 10;
     const int dueDateWidth = 15;
 
-    Utils::printHeader();
-
     // Table header with ASCII borders for better compatibility
     std::cout << "+-" << std::string(idWidth, '-');
     std::cout << "-+-" << std::string(nameWidth, '-');
@@ -492,7 +490,6 @@ std::vector<Task*> Tasks::getSortedTasks() const {
 }
 
 void Tasks::displayTaskList(const std::vector<Task*>& taskList, std::string_view title) const {
-    Utils::printHeader();
     if (!title.empty()) {
         std::cout << Utils::BOLD << title << Utils::RESET << std::endl;
         std::cout << std::endl;

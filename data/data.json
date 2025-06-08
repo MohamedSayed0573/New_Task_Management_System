@@ -1,5 +1,5 @@
 {
-    "nextId": 25,
+    "nextId": 30,
     "tasks": [
         {
             "created_at": 1749378803,
@@ -224,6 +224,46 @@
             "id": 24,
             "name": "Write documentation",
             "priority": 2,
+            "status": 1,
+            "tags": []
+        },
+        {
+            "created_at": 1749395976,
+            "description": "",
+            "id": 25,
+            "name": "Hi",
+            "priority": 1,
+            "status": 1,
+            "tags": []
+        },
+        {
+            "created_at": 1749397815,
+            "description": "",
+            "id": 26,
+            "name": "Test task",
+            "priority": 1,
+            "status": 1,
+            "tags": [
+                "testing"
+            ]
+        },
+        {
+            "completed_at": 1749397900,
+            "created_at": 1749397853,
+            "description": "Testing the CLI rewrite",
+            "id": 28,
+            "name": "Another test task",
+            "priority": 3,
+            "status": 3,
+            "tags": []
+        },
+        {
+            "created_at": 1749398568,
+            "description": "",
+            "due_date": 1749247200,
+            "id": 29,
+            "name": "Test overdue task",
+            "priority": 1,
             "status": 1,
             "tags": []
         }
