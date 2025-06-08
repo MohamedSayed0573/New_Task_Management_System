@@ -4,102 +4,170 @@
 #include <iostream>
 #include <algorithm>
 #include <iomanip>
+#include <ranges>
+#include <format>
 
-Tasks::Tasks(const std::string& dataFile) : nextId(1), dataFile(dataFile) {
+Tasks::Tasks(std::filesystem::path dataFile) : nextId(1), dataFile(std::move(dataFile)) {
     loadFromFile();
 }
 
-void Tasks::addTask(const std::string& name, int status, int priority) {
-    if (name.empty()) {
-        std::cout << Utils::RED << "Error: Task name cannot be empty!" << Utils::RESET << std::endl;
-        return;
+TaskResult Tasks::addTask(std::string_view name, TaskStatus status, TaskPriority priority) {
+    try {
+        auto task = std::make_unique<Task>(nextId++, name, status, priority);
+        tasks.push_back(std::move(task));
+        saveToFile();
+        return TaskResult::successResult("Task added successfully!");
+    } catch (const std::exception& e) {
+        --nextId; // Rollback ID on failure
+        return TaskResult::errorResult(std::format("Failed to add task: {}", e.what()));
     }
-    
-    if (!Utils::isValidStatus(status)) {
-        std::cout << Utils::RED << "Error: Invalid status! Use 1 (To-Do), 2 (In Progress), or 3 (Completed)" << Utils::RESET << std::endl;
-        return;
-    }
-    
-    if (!Utils::isValidPriority(priority)) {
-        std::cout << Utils::RED << "Error: Invalid priority! Use 1 (Low), 2 (Medium), or 3 (High)" << Utils::RESET << std::endl;
-        return;
-    }
-    
-    tasks.push_back(std::make_unique<Task>(nextId++, name, status, priority));
-    saveToFile();
-    
-    std::cout << Utils::GREEN << "Task added successfully!" << Utils::RESET << std::endl;
 }
 
-bool Tasks::removeTask(int id) {
-    auto it = std::find_if(tasks.begin(), tasks.end(),
-        [id](const std::unique_ptr<Task>& task) {
-            return task->getId() == id;
-        });
+TaskResult Tasks::addTask(std::string_view name, std::string_view description, 
+                         TaskStatus status, TaskPriority priority,
+                         const std::optional<std::chrono::system_clock::time_point>& dueDate,
+                         const std::vector<std::string>& tags) {
+    try {
+        auto task = std::make_unique<Task>(nextId++, name, status, priority);
+        task->setDescription(description);
+        if (dueDate) {
+            task->setDueDate(dueDate);
+        }
+        for (const auto& tag : tags) {
+            task->addTag(tag);
+        }
+        
+        tasks.push_back(std::move(task));
+        saveToFile();
+        return TaskResult::successResult("Task added successfully!");
+    } catch (const std::exception& e) {
+        --nextId; // Rollback ID on failure
+        return TaskResult::errorResult(std::format("Failed to add task: {}", e.what()));
+    }
+}
+
+TaskResult Tasks::removeTask(int id) {
+    auto it = std::ranges::find_if(tasks, [id](const auto& task) {
+        return task->getId() == id;
+    });
     
     if (it != tasks.end()) {
         tasks.erase(it);
         saveToFile();
-        std::cout << Utils::GREEN << "Task removed successfully!" << Utils::RESET << std::endl;
-        return true;
+        return TaskResult::successResult("Task removed successfully!");
     }
     
-    std::cout << Utils::RED << "Error: Task with ID " << id << " not found!" << Utils::RESET << std::endl;
-    return false;
+    return TaskResult::errorResult(std::format("Task with ID {} not found!", id));
 }
 
-bool Tasks::updateTask(int id, const std::string& name, int status, int priority) {
-    Task* task = findTask(id);
-    if (!task) {
-        std::cout << Utils::RED << "Error: Task with ID " << id << " not found!" << Utils::RESET << std::endl;
-        return false;
+TaskResult Tasks::updateTask(int id, std::string_view name, TaskStatus status, TaskPriority priority) {
+    if (auto task = findTask(id)) {
+        try {
+            task->setName(name);
+            task->setStatus(status);
+            task->setPriority(priority);
+            saveToFile();
+            return TaskResult::successResult("Task updated successfully!");
+        } catch (const std::exception& e) {
+            return TaskResult::errorResult(std::format("Failed to update task: {}", e.what()));
+        }
     }
     
-    if (name.empty()) {
-        std::cout << Utils::RED << "Error: Task name cannot be empty!" << Utils::RESET << std::endl;
-        return false;
-    }
-    
-    if (!Utils::isValidStatus(status)) {
-        std::cout << Utils::RED << "Error: Invalid status! Use 1 (To-Do), 2 (In Progress), or 3 (Completed)" << Utils::RESET << std::endl;
-        return false;
-    }
-    
-    if (!Utils::isValidPriority(priority)) {
-        std::cout << Utils::RED << "Error: Invalid priority! Use 1 (Low), 2 (Medium), or 3 (High)" << Utils::RESET << std::endl;
-        return false;
-    }
-    
-    task->setName(name);
-    task->setStatus(status);
-    task->setPriority(priority);
-    saveToFile();
-    
-    std::cout << Utils::GREEN << "Task updated successfully!" << Utils::RESET << std::endl;
-    return true;
+    return TaskResult::errorResult(std::format("Task with ID {} not found!", id));
 }
 
-Task* Tasks::findTask(int id) {
-    auto it = std::find_if(tasks.begin(), tasks.end(),
-        [id](const std::unique_ptr<Task>& task) {
-            return task->getId() == id;
-        });
+Task* Tasks::findTask(int id) noexcept {
+    auto it = std::ranges::find_if(tasks, [id](const auto& task) {
+        return task->getId() == id;
+    });
     
     return (it != tasks.end()) ? it->get() : nullptr;
 }
 
-std::vector<Task*> Tasks::searchTasks(const std::string& name) {
+std::vector<Task*> Tasks::searchTasks(std::string_view query) const {
     std::vector<Task*> results;
-    std::string searchLower = Utils::toLowerCase(name);
     
     for (const auto& task : tasks) {
-        std::string taskNameLower = Utils::toLowerCase(task->getName());
-        if (taskNameLower.find(searchLower) != std::string::npos) {
+        if (task->matches(query)) {
             results.push_back(task.get());
         }
     }
     
     return results;
+}
+
+std::vector<Task*> Tasks::getTasksByStatus(TaskStatus status) const {
+    std::vector<Task*> results;
+    
+    for (const auto& task : tasks | std::views::filter([status](const auto& t) {
+        return t->getStatus() == status;
+    })) {
+        results.push_back(task.get());
+    }
+    
+    return results;
+}
+
+std::vector<Task*> Tasks::getTasksByPriority(TaskPriority priority) const {
+    std::vector<Task*> results;
+    
+    for (const auto& task : tasks | std::views::filter([priority](const auto& t) {
+        return t->getPriority() == priority;
+    })) {
+        results.push_back(task.get());
+    }
+    
+    return results;
+}
+
+std::vector<Task*> Tasks::getTasksByTag(std::string_view tag) const {
+    std::vector<Task*> results;
+    
+    for (const auto& task : tasks | std::views::filter([tag](const auto& t) {
+        return t->hasTag(tag);
+    })) {
+        results.push_back(task.get());
+    }
+    
+    return results;
+}
+
+std::vector<Task*> Tasks::getOverdueTasks() const {
+    std::vector<Task*> results;
+    
+    for (const auto& task : tasks | std::views::filter([](const auto& t) {
+        return t->isOverdue();
+    })) {
+        results.push_back(task.get());
+    }
+    
+    return results;
+}
+
+TaskStats Tasks::getStatistics() const {
+    TaskStats stats{};
+    
+    for (const auto& task : tasks) {
+        ++stats.total;
+        
+        switch (task->getStatus()) {
+            case TaskStatus::TODO: ++stats.todo; break;
+            case TaskStatus::IN_PROGRESS: ++stats.inProgress; break;
+            case TaskStatus::COMPLETED: ++stats.completed; break;
+        }
+        
+        switch (task->getPriority()) {
+            case TaskPriority::LOW: ++stats.lowPriority; break;
+            case TaskPriority::MEDIUM: ++stats.mediumPriority; break;
+            case TaskPriority::HIGH: ++stats.highPriority; break;
+        }
+        
+        if (task->isOverdue()) {
+            ++stats.overdue;
+        }
+    }
+    
+    return stats;
 }
 
 void Tasks::showAllTasks() const {
@@ -108,15 +176,19 @@ void Tasks::showAllTasks() const {
         return;
     }
     
+    // Sort tasks for display
+    auto sortedTasks = getSortedTasks();
+    
     Utils::printHeader();
     std::cout << Utils::BOLD << std::left 
               << std::setw(4) << "ID"
-              << std::setw(25) << "Name"
+              << std::setw(30) << "Name"
               << std::setw(12) << "Status"
-              << std::setw(8) << "Priority" << Utils::RESET << std::endl;
+              << std::setw(10) << "Priority"
+              << std::setw(12) << "Due Date" << Utils::RESET << std::endl;
     Utils::printSeparator();
     
-    for (const auto& task : tasks) {
+    for (const auto& task : sortedTasks) {
         std::cout << task->toString() << std::endl;
     }
     
@@ -124,53 +196,86 @@ void Tasks::showAllTasks() const {
     std::cout << Utils::CYAN << "Total tasks: " << tasks.size() << Utils::RESET << std::endl;
 }
 
-void Tasks::showFilteredTasks(const std::string& filter) const {
-    std::vector<Task*> filteredTasks;
-    
-    for (const auto& task : tasks) {
-        bool match = false;
-        
-        if (filter == "-t" && task->getStatus() == 1) match = true;      // To-Do
-        else if (filter == "-i" && task->getStatus() == 2) match = true; // In Progress
-        else if (filter == "-c" && task->getStatus() == 3) match = true; // Completed
-        else if (filter == "-l" && task->getPriority() == 1) match = true; // Low
-        else if (filter == "-m" && task->getPriority() == 2) match = true; // Medium
-        else if (filter == "-h" && task->getPriority() == 3) match = true; // High
-        
-        if (match) {
-            filteredTasks.push_back(task.get());
-        }
+void Tasks::showTaskDetails(int id) const {
+    if (auto task = findTask(id)) {
+        std::cout << task->toDetailedString() << std::endl;
+    } else {
+        std::cout << Utils::RED << "Task with ID " << id << " not found!" << Utils::RESET << std::endl;
     }
+}
+
+void Tasks::showFilteredTasks(TaskStatus status) const {
+    auto filteredTasks = getTasksByStatus(status);
     
     if (filteredTasks.empty()) {
-        std::cout << Utils::YELLOW << "No tasks found matching the filter!" << Utils::RESET << std::endl;
+        // Create a temporary task just to get the status string
+        Task temp(0, "temp", status, TaskPriority::LOW);
+        std::cout << Utils::YELLOW << "No tasks found with status: " 
+                  << temp.getStatusString() << Utils::RESET << std::endl;
         return;
     }
     
-    Utils::printHeader();
-    std::cout << Utils::BOLD << std::left 
-              << std::setw(4) << "ID"
-              << std::setw(25) << "Name"
-              << std::setw(12) << "Status"
-              << std::setw(8) << "Priority" << Utils::RESET << std::endl;
-    Utils::printSeparator();
-    
-    for (const auto& task : filteredTasks) {
-        std::cout << task->toString() << std::endl;
+    // Create a temporary task just to get the status string
+    Task temp(0, "temp", status, TaskPriority::LOW);
+    displayTaskList(filteredTasks, std::format("Tasks with status: {}", temp.getStatusString()));
+}
+
+void Tasks::showFilteredTasks(TaskPriority priority) const {
+    auto filteredTasks = getTasksByPriority(priority);
+     if (filteredTasks.empty()) {
+        std::cout << Utils::YELLOW << "No tasks found with priority: " 
+                  << Utils::getPriorityString(priority) << Utils::RESET << std::endl;
+        return;
     }
     
-    Utils::printSeparator();
-    std::cout << Utils::CYAN << "Filtered tasks: " << filteredTasks.size() << Utils::RESET << std::endl;
+    displayTaskList(filteredTasks, std::format("Tasks with priority: {}", Utils::getPriorityString(priority)));
+}
+
+void Tasks::showOverdueTasks() const {
+    auto overdueTasks = getOverdueTasks();
+    
+    if (overdueTasks.empty()) {
+        std::cout << Utils::YELLOW << "No overdue tasks found!" << Utils::RESET << std::endl;
+        return;
+    }
+    
+    displayTaskList(overdueTasks, "Overdue Tasks");
+}
+
+void Tasks::showStatistics() const {
+    auto stats = getStatistics();
+    
+    std::cout << Utils::BOLD << "📊 Task Statistics" << Utils::RESET << std::endl;
+    std::cout << "==================" << std::endl;
+    std::cout << "Total tasks: " << Utils::CYAN << stats.total << Utils::RESET << std::endl;
+    std::cout << "To-Do: " << Utils::RED << stats.todo << Utils::RESET << std::endl;
+    std::cout << "In Progress: " << Utils::YELLOW << stats.inProgress << Utils::RESET << std::endl;
+    std::cout << "Completed: " << Utils::GREEN << stats.completed << Utils::RESET << std::endl;
+    std::cout << std::endl;
+    std::cout << "Priority breakdown:" << std::endl;
+    std::cout << "High: " << Utils::RED << stats.highPriority << Utils::RESET << std::endl;
+    std::cout << "Medium: " << Utils::YELLOW << stats.mediumPriority << Utils::RESET << std::endl;
+    std::cout << "Low: " << Utils::BLUE << stats.lowPriority << Utils::RESET << std::endl;
+    
+    if (stats.overdue > 0) {
+        std::cout << std::endl;
+        std::cout << Utils::RED << "⚠️  Overdue tasks: " << stats.overdue << Utils::RESET << std::endl;
+    }
 }
 
 void Tasks::loadFromFile() {
-    std::ifstream file(dataFile);
-    if (!file.is_open()) {
-        // File doesn't exist yet, that's okay
+    if (!std::filesystem::exists(dataFile)) {
+        // Create directory if it doesn't exist
+        std::filesystem::create_directories(dataFile.parent_path());
         return;
     }
     
     try {
+        std::ifstream file(dataFile);
+        if (!file.is_open()) {
+            throw std::runtime_error("Could not open data file for reading");
+        }
+        
         nlohmann::json j;
         file >> j;
         
@@ -186,35 +291,87 @@ void Tasks::loadFromFile() {
     } catch (const std::exception& e) {
         std::cout << Utils::RED << "Error loading data: " << e.what() << Utils::RESET << std::endl;
     }
-    
-    file.close();
 }
 
 void Tasks::saveToFile() const {
-    nlohmann::json j;
-    j["nextId"] = nextId;
-    
-    for (const auto& task : tasks) {
-        j["tasks"].push_back(task->toJson());
-    }
-    
-    std::ofstream file(dataFile);
-    if (file.is_open()) {
+    try {
+        // Ensure directory exists
+        std::filesystem::create_directories(dataFile.parent_path());
+        
+        nlohmann::json j{
+            {"nextId", nextId},
+            {"tasks", nlohmann::json::array()}
+        };
+        
+        for (const auto& task : tasks) {
+            j["tasks"].push_back(task->toJson());
+        }
+        
+        std::ofstream file(dataFile);
+        if (!file.is_open()) {
+            throw std::runtime_error("Could not open data file for writing");
+        }
+        
         file << j.dump(4);
-        file.close();
-    } else {
-        std::cout << Utils::RED << "Error: Could not save to file!" << Utils::RESET << std::endl;
+    } catch (const std::exception& e) {
+        std::cout << Utils::RED << "Error saving data: " << e.what() << Utils::RESET << std::endl;
     }
 }
 
-int Tasks::getNextId() const {
+std::vector<Task*> Tasks::getSortedTasks() const {
+    std::vector<Task*> sortedTasks;
+    
+    for (const auto& task : tasks) {
+        sortedTasks.push_back(task.get());
+    }
+    
+    std::ranges::sort(sortedTasks, [](const Task* a, const Task* b) {
+        return *a < *b;  // Use Task's operator<
+    });
+    
+    return sortedTasks;
+}
+
+void Tasks::displayTaskList(const std::vector<Task*>& taskList, std::string_view title) const {
+    Utils::printHeader();
+    if (!title.empty()) {
+        std::cout << Utils::BOLD << title << Utils::RESET << std::endl;
+        Utils::printSeparator();
+    }
+    
+    std::cout << Utils::BOLD << std::left 
+              << std::setw(4) << "ID"
+              << std::setw(30) << "Name"
+              << std::setw(12) << "Status"
+              << std::setw(10) << "Priority"
+              << std::setw(12) << "Due Date" << Utils::RESET << std::endl;
+    Utils::printSeparator();
+    
+    for (const auto& task : taskList) {
+        std::cout << task->toString() << std::endl;
+    }
+    
+    Utils::printSeparator();
+    std::cout << Utils::CYAN << "Count: " << taskList.size() << Utils::RESET << std::endl;
+}
+
+// Const version of findTask
+const Task* Tasks::findTask(int id) const noexcept {
+    auto it = std::ranges::find_if(tasks, [id](const auto& task) {
+        return task->getId() == id;
+    });
+    
+    return (it != tasks.end()) ? it->get() : nullptr;
+}
+
+[[nodiscard]] int Tasks::getNextId() const noexcept {
     return nextId;
 }
 
-bool Tasks::isEmpty() const {
+[[nodiscard]] bool Tasks::isEmpty() const noexcept {
     return tasks.empty();
 }
 
-size_t Tasks::size() const {
+[[nodiscard]] size_t Tasks::size() const noexcept {
     return tasks.size();
 }

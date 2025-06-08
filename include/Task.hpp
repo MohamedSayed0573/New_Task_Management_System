@@ -2,40 +2,100 @@
 #define TASK_HPP
 
 #include <string>
+#include <chrono>
+#include <optional>
+#include <string_view>
+#include <vector>
 #include "json.hpp"
+
+enum class TaskStatus : int {
+    TODO = 1,
+    IN_PROGRESS = 2,
+    COMPLETED = 3
+};
+
+enum class TaskPriority : int {
+    LOW = 1,
+    MEDIUM = 2,
+    HIGH = 3
+};
 
 class Task {
 private:
     int id;
     std::string name;
-    int status;    // 1=To-Do, 2=In Progress, 3=Completed
-    int priority;  // 1=Low, 2=Medium, 3=High
+    TaskStatus status;
+    TaskPriority priority;
+    std::chrono::system_clock::time_point created_at;
+    std::optional<std::chrono::system_clock::time_point> completed_at;
+    std::optional<std::chrono::system_clock::time_point> due_date;
+    std::string description;
+    std::vector<std::string> tags;
 
 public:
-    // Constructor
-    Task(int id, const std::string& name, int status = 1, int priority = 1);
+    // Constructor with modern initialization
+    Task(int id, std::string_view name, TaskStatus status = TaskStatus::TODO, 
+         TaskPriority priority = TaskPriority::LOW);
+    
+    // Rule of 5 (modern C++)
+    Task(const Task&) = default;
+    Task(Task&&) = default;
+    Task& operator=(const Task&) = default;
+    Task& operator=(Task&&) = default;
+    ~Task() = default;
     
     // Getters
-    int getId() const;
-    std::string getName() const;
-    int getStatus() const;
-    int getPriority() const;
+    [[nodiscard]] int getId() const noexcept;
+    [[nodiscard]] const std::string& getName() const noexcept;
+    [[nodiscard]] TaskStatus getStatus() const noexcept;
+    [[nodiscard]] TaskPriority getPriority() const noexcept;
+    [[nodiscard]] const std::chrono::system_clock::time_point& getCreatedAt() const noexcept;
+    [[nodiscard]] const std::optional<std::chrono::system_clock::time_point>& getCompletedAt() const noexcept;
+    [[nodiscard]] const std::optional<std::chrono::system_clock::time_point>& getDueDate() const noexcept;
+    [[nodiscard]] const std::string& getDescription() const noexcept;
+    [[nodiscard]] const std::vector<std::string>& getTags() const noexcept;
     
-    // Setters
-    void setName(const std::string& name);
-    void setStatus(int status);
-    void setPriority(int priority);
+    // Setters with validation
+    void setName(std::string_view name);
+    void setStatus(TaskStatus status);
+    void setPriority(TaskPriority priority);
+    void setDescription(std::string_view description);
+    void setDueDate(const std::optional<std::chrono::system_clock::time_point>& due_date);
+    
+    // Tag management
+    void addTag(std::string_view tag);
+    void removeTag(std::string_view tag);
+    [[nodiscard]] bool hasTag(std::string_view tag) const;
     
     // Status helper methods
-    std::string getStatusString() const;
-    std::string getPriorityString() const;
+    [[nodiscard]] std::string getStatusString() const;
+    [[nodiscard]] std::string getPriorityString() const;
+    [[nodiscard]] std::string getFormattedCreatedAt() const;
+    [[nodiscard]] std::string getFormattedDueDate() const;
+    [[nodiscard]] bool isOverdue() const;
+    [[nodiscard]] std::chrono::days getDaysUntilDue() const;
+    
+    // Utility methods
+    void markCompleted();
+    [[nodiscard]] bool matches(std::string_view query) const;
     
     // JSON serialization
-    nlohmann::json toJson() const;
+    [[nodiscard]] nlohmann::json toJson() const;
     static Task fromJson(const nlohmann::json& j);
     
     // Display
-    std::string toString() const;
+    [[nodiscard]] std::string toString() const;
+    [[nodiscard]] std::string toDetailedString() const;
+    
+    // Operators
+    bool operator==(const Task& other) const noexcept;
+    bool operator<(const Task& other) const noexcept;  // For sorting by priority then due date
 };
+
+// Utility functions for enum conversions
+[[nodiscard]] TaskStatus intToTaskStatus(int status);
+[[nodiscard]] TaskPriority intToTaskPriority(int priority);
+[[nodiscard]] int taskStatusToInt(TaskStatus status) noexcept;
+[[nodiscard]] int taskPriorityToInt(TaskPriority priority) noexcept;
 
 #endif // TASK_HPP

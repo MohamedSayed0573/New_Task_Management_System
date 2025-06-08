@@ -4,6 +4,7 @@
 #include <vector>
 #include <string>
 #include <algorithm>
+#include <format>
 
 class TodoApp {
 private:
@@ -48,43 +49,65 @@ private:
         return args;
     }
     
+    void printResult(const TaskResult& result) {
+        if (result.success) {
+            std::cout << Utils::GREEN << result.message << Utils::RESET << std::endl;
+        } else {
+            std::cout << Utils::RED << "Error: " << result.message << Utils::RESET << std::endl;
+        }
+    }
+
 public:
     TodoApp() : tasks("data/data.json") {}
     
     void run(int argc, char* argv[]) {
         if (argc < 2) {
             Utils::printHeader();
-            std::cout << Utils::YELLOW << "Welcome to To-Do List Manager!" << Utils::RESET << std::endl;
+            std::cout << Utils::YELLOW << "Welcome to To-Do List Manager v2.0!" << Utils::RESET << std::endl;
             std::cout << "Use --help or -h for available commands." << std::endl;
             return;
         }
         
         std::vector<std::string> args = parseArguments(argc, argv);
-        std::string command = args[0];
+        std::string command = Utils::toLowerCase(args[0]);
         
-        // Convert command to lowercase for case-insensitive matching
-        std::transform(command.begin(), command.end(), command.begin(), ::tolower);
-        
-        if (command == "add") {
-            handleAdd(args);
-        } else if (command == "show") {
-            handleShow(args);
-        } else if (command == "update") {
-            handleUpdate(args);
-        } else if (command == "remove" || command == "rm") {
-            handleRemove(args);
-        } else if (command == "search") {
-            handleSearch(args);
-        } else if (command == "--help" || command == "-h") {
-            Utils::printHelp();
-        } else if (command == "--version" || command == "-v") {
-            Utils::printVersion();
-        } else {
-            std::cout << Utils::RED << "Unknown command: " << command << Utils::RESET << std::endl;
-            std::cout << "Use --help or -h for available commands." << std::endl;
+        try {
+            if (command == "add") {
+                handleAdd(args);
+            } else if (command == "show") {
+                handleShow(args);
+            } else if (command == "update") {
+                handleUpdate(args);
+            } else if (command == "remove" || command == "rm") {
+                handleRemove(args);
+            } else if (command == "search") {
+                handleSearch(args);
+            } else if (command == "detail") {
+                handleDetail(args);
+            } else if (command == "overdue") {
+                handleOverdue(args);
+            } else if (command == "stats") {
+                handleStats(args);
+            } else if (command == "tag") {
+                handleTag(args);
+            } else if (command == "untag") {
+                handleUntag(args);
+            } else if (command == "due") {
+                handleDue(args);
+            } else if (command == "complete") {
+                handleComplete(args);
+            } else if (command == "--help" || command == "-h") {
+                Utils::printHelp();
+            } else if (command == "--version" || command == "-v") {
+                Utils::printVersion();
+            } else {
+                std::cout << Utils::RED << "Unknown command: " << command << Utils::RESET << std::endl;
+                std::cout << "Use --help or -h for available commands." << std::endl;
+            }
+        } catch (const std::exception& e) {
+            std::cout << Utils::RED << "Error: " << e.what() << Utils::RESET << std::endl;
         }
     }
-    
 private:
     void handleAdd(const std::vector<std::string>& args) {
         if (args.size() < 2) {
@@ -93,31 +116,59 @@ private:
         }
         
         std::string name = args[1];
-        int status = 1; // Default: To-Do
-        int priority = 1; // Default: Low
+        TaskStatus status = TaskStatus::TODO;
+        TaskPriority priority = TaskPriority::LOW;
         
-        if (args.size() > 2 && Utils::isNumber(args[2])) {
-            status = std::stoi(args[2]);
+        // Parse status if provided
+        if (args.size() > 2) {
+            try {
+                status = Utils::parseTaskStatus(args[2]);
+            } catch (const std::exception& e) {
+                std::cout << Utils::RED << "Error: " << e.what() << Utils::RESET << std::endl;
+                return;
+            }
         }
         
-        if (args.size() > 3 && Utils::isNumber(args[3])) {
-            priority = std::stoi(args[3]);
+        // Parse priority if provided
+        if (args.size() > 3) {
+            try {
+                priority = Utils::parseTaskPriority(args[3]);
+            } catch (const std::exception& e) {
+                std::cout << Utils::RED << "Error: " << e.what() << Utils::RESET << std::endl;
+                return;
+            }
         }
         
-        tasks.addTask(name, status, priority);
+        auto result = tasks.addTask(name, status, priority);
+        printResult(result);
     }
     
     void handleShow(const std::vector<std::string>& args) {
         if (args.size() == 1) {
             tasks.showAllTasks();
         } else if (args.size() == 2) {
-            std::string filter = args[1];
-            if (filter == "-t" || filter == "-i" || filter == "-c" ||
-                filter == "-l" || filter == "-m" || filter == "-h") {
-                tasks.showFilteredTasks(filter);
-            } else {
+            std::string filter = Utils::toLowerCase(args[1]);
+            
+            try {
+                // Try to parse as status
+                if (filter == "todo" || filter == "inprogress" || filter == "completed") {
+                    TaskStatus status = Utils::parseTaskStatus(filter);
+                    tasks.showFilteredTasks(status);
+                    return;
+                }
+                
+                // Try to parse as priority
+                if (filter == "low" || filter == "medium" || filter == "high") {
+                    TaskPriority priority = Utils::parseTaskPriority(filter);
+                    tasks.showFilteredTasks(priority);
+                    return;
+                }
+                
                 std::cout << Utils::RED << "Invalid filter: " << filter << Utils::RESET << std::endl;
-                std::cout << "Valid filters: -t (To-Do), -i (In Progress), -c (Completed), -l (Low), -m (Medium), -h (High)" << std::endl;
+                std::cout << "Valid filters: todo, inprogress, completed, low, medium, high" << std::endl;
+                
+            } catch (const std::exception& e) {
+                std::cout << Utils::RED << "Error: " << e.what() << Utils::RESET << std::endl;
             }
         } else {
             std::cout << Utils::RED << "Usage: show [filter]" << Utils::RESET << std::endl;
@@ -135,22 +186,18 @@ private:
             return;
         }
         
-        if (!Utils::isNumber(args[3])) {
-            std::cout << Utils::RED << "Invalid status: " << args[3] << Utils::RESET << std::endl;
-            return;
+        try {
+            int id = std::stoi(args[1]);
+            std::string name = args[2];
+            TaskStatus status = Utils::parseTaskStatus(args[3]);
+            TaskPriority priority = Utils::parseTaskPriority(args[4]);
+            
+            auto result = tasks.updateTask(id, name, status, priority);
+            printResult(result);
+            
+        } catch (const std::exception& e) {
+            std::cout << Utils::RED << "Error: " << e.what() << Utils::RESET << std::endl;
         }
-        
-        if (!Utils::isNumber(args[4])) {
-            std::cout << Utils::RED << "Invalid priority: " << args[4] << Utils::RESET << std::endl;
-            return;
-        }
-        
-        int id = std::stoi(args[1]);
-        std::string name = args[2];
-        int status = std::stoi(args[3]);
-        int priority = std::stoi(args[4]);
-        
-        tasks.updateTask(id, name, status, priority);
     }
     
     void handleRemove(const std::vector<std::string>& args) {
@@ -165,12 +212,13 @@ private:
         }
         
         int id = std::stoi(args[1]);
-        tasks.removeTask(id);
+        auto result = tasks.removeTask(id);
+        printResult(result);
     }
     
     void handleSearch(const std::vector<std::string>& args) {
         if (args.size() != 2) {
-            std::cout << Utils::RED << "Usage: search <task_name>" << Utils::RESET << std::endl;
+            std::cout << Utils::RED << "Usage: search <query>" << Utils::RESET << std::endl;
             return;
         }
         
@@ -182,23 +230,132 @@ private:
             return;
         }
         
-        Utils::printHeader();
-        std::cout << Utils::BOLD << "Search results for: " << searchTerm << Utils::RESET << std::endl;
-        Utils::printSeparator();
-        
-        std::cout << Utils::BOLD << std::left 
-                  << std::setw(4) << "ID"
-                  << std::setw(25) << "Name"
-                  << std::setw(12) << "Status"
-                  << std::setw(8) << "Priority" << Utils::RESET << std::endl;
-        Utils::printSeparator();
-        
-        for (const auto& task : results) {
-            std::cout << task->toString() << std::endl;
+        tasks.displayTaskList(results, std::format("Search results for: {}", searchTerm));
+    }
+    
+    void handleDetail(const std::vector<std::string>& args) {
+        if (args.size() != 2) {
+            std::cout << Utils::RED << "Usage: detail <task_ID>" << Utils::RESET << std::endl;
+            return;
         }
         
-        Utils::printSeparator();
-        std::cout << Utils::CYAN << "Found " << results.size() << " task(s)" << Utils::RESET << std::endl;
+        if (!Utils::isNumber(args[1])) {
+            std::cout << Utils::RED << "Invalid task ID: " << args[1] << Utils::RESET << std::endl;
+            return;
+        }
+        
+        int id = std::stoi(args[1]);
+        tasks.showTaskDetails(id);
+    }
+    
+    void handleOverdue(const std::vector<std::string>& args) {
+        if (args.size() != 1) {
+            std::cout << Utils::RED << "Usage: overdue" << Utils::RESET << std::endl;
+            return;
+        }
+        
+        tasks.showOverdueTasks();
+    }
+    
+    void handleStats(const std::vector<std::string>& args) {
+        if (args.size() != 1) {
+            std::cout << Utils::RED << "Usage: stats" << Utils::RESET << std::endl;
+            return;
+        }
+        
+        tasks.showStatistics();
+    }
+    
+    void handleTag(const std::vector<std::string>& args) {
+        if (args.size() != 3) {
+            std::cout << Utils::RED << "Usage: tag <task_ID> <tag>" << Utils::RESET << std::endl;
+            return;
+        }
+        
+        if (!Utils::isNumber(args[1])) {
+            std::cout << Utils::RED << "Invalid task ID: " << args[1] << Utils::RESET << std::endl;
+            return;
+        }
+        
+        int id = std::stoi(args[1]);
+        std::string tag = args[2];
+        
+        if (auto task = tasks.findTask(id)) {
+            task->addTag(tag);
+            std::cout << Utils::GREEN << "Tag added successfully!" << Utils::RESET << std::endl;
+        } else {
+            std::cout << Utils::RED << "Task with ID " << id << " not found!" << Utils::RESET << std::endl;
+        }
+    }
+    
+    void handleUntag(const std::vector<std::string>& args) {
+        if (args.size() != 3) {
+            std::cout << Utils::RED << "Usage: untag <task_ID> <tag>" << Utils::RESET << std::endl;
+            return;
+        }
+        
+        if (!Utils::isNumber(args[1])) {
+            std::cout << Utils::RED << "Invalid task ID: " << args[1] << Utils::RESET << std::endl;
+            return;
+        }
+        
+        int id = std::stoi(args[1]);
+        std::string tag = args[2];
+        
+        if (auto task = tasks.findTask(id)) {
+            task->removeTag(tag);
+            std::cout << Utils::GREEN << "Tag removed successfully!" << Utils::RESET << std::endl;
+        } else {
+            std::cout << Utils::RED << "Task with ID " << id << " not found!" << Utils::RESET << std::endl;
+        }
+    }
+    
+    void handleDue(const std::vector<std::string>& args) {
+        if (args.size() != 3) {
+            std::cout << Utils::RED << "Usage: due <task_ID> <date> (YYYY-MM-DD format)" << Utils::RESET << std::endl;
+            return;
+        }
+        
+        if (!Utils::isNumber(args[1])) {
+            std::cout << Utils::RED << "Invalid task ID: " << args[1] << Utils::RESET << std::endl;
+            return;
+        }
+        
+        int id = std::stoi(args[1]);
+        
+        auto dueDate = Utils::parseDate(args[2]);
+        if (!dueDate) {
+            std::cout << Utils::RED << "Invalid date format. Use YYYY-MM-DD" << Utils::RESET << std::endl;
+            return;
+        }
+        
+        if (auto task = tasks.findTask(id)) {
+            task->setDueDate(dueDate);
+            std::cout << Utils::GREEN << "Due date set successfully!" << Utils::RESET << std::endl;
+        } else {
+            std::cout << Utils::RED << "Task with ID " << id << " not found!" << Utils::RESET << std::endl;
+        }
+    }
+    
+    void handleComplete(const std::vector<std::string>& args) {
+        if (args.size() != 2) {
+            std::cout << Utils::RED << "Usage: complete <task_ID>" << Utils::RESET << std::endl;
+            return;
+        }
+        
+        if (!Utils::isNumber(args[1])) {
+            std::cout << Utils::RED << "Invalid task ID: " << args[1] << Utils::RESET << std::endl;
+            return;
+        }
+        
+        int id = std::stoi(args[1]);
+        
+        if (auto task = tasks.findTask(id)) {
+            task->markCompleted();
+            std::cout << Utils::GREEN << "Task marked as completed!" << Utils::RESET << std::endl;
+        } else {
+            std::cout << Utils::RED << "Task with ID " << id << " not found!" << Utils::RESET << std::endl;
+        }
     }
 };
 
