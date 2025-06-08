@@ -1,5 +1,5 @@
 {
-    "nextId": 16,
+    "nextId": 25,
     "tasks": [
         {
             "created_at": 1749378803,
@@ -142,6 +142,88 @@
             "id": 15,
             "name": "Test old format",
             "priority": 1,
+            "status": 1,
+            "tags": []
+        },
+        {
+            "created_at": 1749389282,
+            "description": "",
+            "id": 16,
+            "name": "Test CLI11 integration",
+            "priority": 3,
+            "status": 1,
+            "tags": []
+        },
+        {
+            "created_at": 1749389566,
+            "description": "",
+            "id": 17,
+            "name": "Test without welcome message",
+            "priority": 2,
+            "status": 1,
+            "tags": []
+        },
+        {
+            "created_at": 1749392103,
+            "description": "",
+            "id": 18,
+            "name": "Test task",
+            "priority": 1,
+            "status": 1,
+            "tags": []
+        },
+        {
+            "created_at": 1749392153,
+            "description": "",
+            "id": 19,
+            "name": "Test task",
+            "priority": 1,
+            "status": 1,
+            "tags": []
+        },
+        {
+            "created_at": 1749392246,
+            "description": "",
+            "id": 20,
+            "name": "Test task",
+            "priority": 1,
+            "status": 1,
+            "tags": []
+        },
+        {
+            "created_at": 1749392265,
+            "description": "",
+            "id": 21,
+            "name": "Test task",
+            "priority": 1,
+            "status": 1,
+            "tags": []
+        },
+        {
+            "completed_at": 1749392549,
+            "created_at": 1749392415,
+            "description": "",
+            "id": 22,
+            "name": "CLI11 Integration Completed",
+            "priority": 3,
+            "status": 3,
+            "tags": []
+        },
+        {
+            "created_at": 1749392415,
+            "description": "",
+            "id": 23,
+            "name": "Test table formatting",
+            "priority": 3,
+            "status": 2,
+            "tags": []
+        },
+        {
+            "created_at": 1749392415,
+            "description": "",
+            "id": 24,
+            "name": "Write documentation",
+            "priority": 2,
             "status": 1,
             "tags": []
         }

@@ -34,16 +34,16 @@ private:
 
 public:
     // Constructor with modern initialization
-    Task(int id, std::string_view name, TaskStatus status = TaskStatus::TODO, 
-         TaskPriority priority = TaskPriority::LOW);
-    
+    Task(int id, std::string_view name, TaskStatus status = TaskStatus::TODO,
+        TaskPriority priority = TaskPriority::LOW);
+
     // Rule of 5 (modern C++)
     Task(const Task&) = default;
     Task(Task&&) = default;
     Task& operator=(const Task&) = default;
     Task& operator=(Task&&) = default;
     ~Task() = default;
-    
+
     // Getters
     [[nodiscard]] int getId() const noexcept;
     [[nodiscard]] const std::string& getName() const noexcept;
@@ -54,19 +54,19 @@ public:
     [[nodiscard]] const std::optional<std::chrono::system_clock::time_point>& getDueDate() const noexcept;
     [[nodiscard]] const std::string& getDescription() const noexcept;
     [[nodiscard]] const std::vector<std::string>& getTags() const noexcept;
-    
+
     // Setters with validation
     void setName(std::string_view name);
     void setStatus(TaskStatus status);
     void setPriority(TaskPriority priority);
     void setDescription(std::string_view description);
     void setDueDate(const std::optional<std::chrono::system_clock::time_point>& due_date);
-    
+
     // Tag management
     void addTag(std::string_view tag);
     void removeTag(std::string_view tag);
     [[nodiscard]] bool hasTag(std::string_view tag) const;
-    
+
     // Status helper methods
     [[nodiscard]] std::string getStatusString() const;
     [[nodiscard]] std::string getPriorityString() const;
@@ -74,19 +74,19 @@ public:
     [[nodiscard]] std::string getFormattedDueDate() const;
     [[nodiscard]] bool isOverdue() const;
     [[nodiscard]] std::chrono::days getDaysUntilDue() const;
-    
+
     // Utility methods
     void markCompleted();
     [[nodiscard]] bool matches(std::string_view query) const;
-    
+
     // JSON serialization
     [[nodiscard]] nlohmann::json toJson() const;
     static Task fromJson(const nlohmann::json& j);
-    
+
     // Display
     [[nodiscard]] std::string toString() const;
     [[nodiscard]] std::string toDetailedString() const;
-    
+
     // Operators
     bool operator==(const Task& other) const noexcept;
     bool operator<(const Task& other) const noexcept;  // For sorting by priority then due date
