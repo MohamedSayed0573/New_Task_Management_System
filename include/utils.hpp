@@ -35,6 +35,17 @@ namespace Utils {
     [[nodiscard]] std::string formatTimeAgo(const std::chrono::system_clock::time_point& tp);
     [[nodiscard]] std::optional<std::chrono::system_clock::time_point> parseDate(std::string_view date_str);
     
+    // Enhanced flexible date parsing
+    [[nodiscard]] std::optional<std::chrono::system_clock::time_point> parseFlexibleDate(std::string_view date_str);
+    [[nodiscard]] std::chrono::system_clock::time_point getToday();
+    [[nodiscard]] std::chrono::system_clock::time_point getTomorrow();
+    [[nodiscard]] std::chrono::system_clock::time_point getYesterday();
+    [[nodiscard]] std::chrono::system_clock::time_point getNextWeek();
+    [[nodiscard]] std::chrono::system_clock::time_point getNextMonth();
+    [[nodiscard]] std::chrono::system_clock::time_point addDays(const std::chrono::system_clock::time_point& tp, int days);
+    [[nodiscard]] std::chrono::system_clock::time_point addWeeks(const std::chrono::system_clock::time_point& tp, int weeks);
+    [[nodiscard]] std::string getRelativeDateExamples();
+    
     // Enhanced display utilities
     void printHeader();
     void printSubHeader(std::string_view title);

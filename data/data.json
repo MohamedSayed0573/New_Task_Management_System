@@ -1,5 +1,5 @@
 {
-    "nextId": 6,
+    "nextId": 16,
     "tasks": [
         {
             "created_at": 1749378803,
@@ -42,6 +42,106 @@
             "id": 5,
             "name": "Deploy to production",
             "priority": 3,
+            "status": 1,
+            "tags": []
+        },
+        {
+            "created_at": 1749382463,
+            "description": "",
+            "due_date": 1749416400,
+            "id": 6,
+            "name": "Test flexible dates",
+            "priority": 2,
+            "status": 1,
+            "tags": []
+        },
+        {
+            "created_at": 1749382530,
+            "description": "",
+            "due_date": 1749762000,
+            "id": 7,
+            "name": "Meeting with team",
+            "priority": 3,
+            "status": 1,
+            "tags": []
+        },
+        {
+            "created_at": 1749382548,
+            "description": "",
+            "due_date": 1750539600,
+            "id": 8,
+            "name": "Project deadline",
+            "priority": 3,
+            "status": 1,
+            "tags": []
+        },
+        {
+            "created_at": 1749382563,
+            "description": "",
+            "due_date": 1749762000,
+            "id": 9,
+            "name": "Quick task",
+            "priority": 1,
+            "status": 1,
+            "tags": []
+        },
+        {
+            "created_at": 1749382748,
+            "description": "",
+            "due_date": 1749330000,
+            "id": 10,
+            "name": "Test weekday parsing",
+            "priority": 2,
+            "status": 1,
+            "tags": []
+        },
+        {
+            "created_at": 1749382777,
+            "description": "",
+            "due_date": 1749330000,
+            "id": 11,
+            "name": "Test today parsing",
+            "priority": 1,
+            "status": 1,
+            "tags": []
+        },
+        {
+            "created_at": 1749383324,
+            "description": "",
+            "due_date": 1749815394,
+            "id": 12,
+            "name": "Test simplified parsing",
+            "priority": 2,
+            "status": 1,
+            "tags": []
+        },
+        {
+            "created_at": 1749383346,
+            "description": "",
+            "due_date": 1749416400,
+            "id": 13,
+            "name": "Test tomorrow",
+            "priority": 1,
+            "status": 1,
+            "tags": []
+        },
+        {
+            "created_at": 1749383380,
+            "description": "",
+            "due_date": 1750247453,
+            "id": 14,
+            "name": "Test after X days",
+            "priority": 3,
+            "status": 1,
+            "tags": []
+        },
+        {
+            "created_at": 1749383479,
+            "description": "",
+            "due_date": 1396476000,
+            "id": 15,
+            "name": "Test old format",
+            "priority": 1,
             "status": 1,
             "tags": []
         }

@@ -126,6 +126,8 @@ public:
                 handleComplete(args);
             } else if (command == "--help" || command == "-h") {
                 Utils::printHelp();
+            } else if (command == "advanced-help" || command == "--advanced-help") {
+                Utils::printAdvancedHelp();
             } else if (command == "--version" || command == "-v") {
                 Utils::printVersion();
             } else {
