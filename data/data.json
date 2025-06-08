@@ -1,0 +1,35 @@
+{
+    "nextId": 7,
+    "tasks": [
+        {
+            "id": 1,
+            "name": "Learn advanced C++20 features",
+            "priority": 3,
+            "status": 1
+        },
+        {
+            "id": 2,
+            "name": "Complete comprehensive documentation",
+            "priority": 2,
+            "status": 3
+        },
+        {
+            "id": 3,
+            "name": "Set up CI/CD pipeline",
+            "priority": 2,
+            "status": 1
+        },
+        {
+            "id": 5,
+            "name": "Deploy to production",
+            "priority": 3,
+            "status": 1
+        },
+        {
+            "id": 6,
+            "name": "Sample task",
+            "priority": 2,
+            "status": 1
+        }
+    ]
+}
