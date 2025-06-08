@@ -10,6 +10,19 @@ class TodoApp {
 private:
     Tasks tasks;
     
+    // String constants for common error messages
+    static constexpr const char* TASK_NOT_FOUND_MSG = "Task with ID {} not found!";
+    static constexpr const char* INVALID_TASK_ID_MSG = "Invalid task ID: {}";
+    static constexpr const char* USAGE_TAG_MSG = "Usage: tag <task_ID> <tag>";
+    static constexpr const char* USAGE_UNTAG_MSG = "Usage: untag <task_ID> <tag>";
+    static constexpr const char* USAGE_DUE_MSG = "Usage: due <task_ID> <date> (YYYY-MM-DD format)";
+    static constexpr const char* USAGE_DETAIL_MSG = "Usage: detail <task_ID>";
+    static constexpr const char* USAGE_REMOVE_MSG = "Usage: remove <task_ID>";
+    static constexpr const char* TAG_ADDED_MSG = "Tag added successfully!";
+    static constexpr const char* TAG_REMOVED_MSG = "Tag removed successfully!";
+    static constexpr const char* DUE_DATE_SET_MSG = "Due date set successfully!";
+    static constexpr const char* INVALID_DATE_FORMAT_MSG = "Invalid date format. Use YYYY-MM-DD";
+    
     // Helper method to parse quoted arguments
     std::vector<std::string> parseArguments(int argc, char* argv[]) {
         std::vector<std::string> args;
@@ -55,6 +68,21 @@ private:
         } else {
             std::cout << Utils::RED << "Error: " << result.message << Utils::RESET << std::endl;
         }
+    }
+
+    // Helper method to validate task ID and return task pointer
+    Task* validateAndFindTask(const std::string& idStr) {
+        if (!Utils::isNumber(idStr)) {
+            std::cout << Utils::RED << std::format(INVALID_TASK_ID_MSG, idStr) << Utils::RESET << std::endl;
+            return nullptr;
+        }
+        
+        int id = std::stoi(idStr);
+        auto task = tasks.findTask(id);
+        if (!task) {
+            std::cout << Utils::RED << std::format(TASK_NOT_FOUND_MSG, id) << Utils::RESET << std::endl;
+        }
+        return task;
     }
 
 public:
@@ -181,11 +209,6 @@ private:
             return;
         }
         
-        if (!Utils::isNumber(args[1])) {
-            std::cout << Utils::RED << "Invalid task ID: " << args[1] << Utils::RESET << std::endl;
-            return;
-        }
-        
         try {
             int id = std::stoi(args[1]);
             std::string name = args[2];
@@ -202,12 +225,12 @@ private:
     
     void handleRemove(const std::vector<std::string>& args) {
         if (args.size() != 2) {
-            std::cout << Utils::RED << "Usage: remove <task_ID>" << Utils::RESET << std::endl;
+            std::cout << Utils::RED << USAGE_REMOVE_MSG << Utils::RESET << std::endl;
             return;
         }
         
         if (!Utils::isNumber(args[1])) {
-            std::cout << Utils::RED << "Invalid task ID: " << args[1] << Utils::RESET << std::endl;
+            std::cout << Utils::RED << std::format(INVALID_TASK_ID_MSG, args[1]) << Utils::RESET << std::endl;
             return;
         }
         
@@ -235,12 +258,12 @@ private:
     
     void handleDetail(const std::vector<std::string>& args) {
         if (args.size() != 2) {
-            std::cout << Utils::RED << "Usage: detail <task_ID>" << Utils::RESET << std::endl;
+            std::cout << Utils::RED << USAGE_DETAIL_MSG << Utils::RESET << std::endl;
             return;
         }
         
         if (!Utils::isNumber(args[1])) {
-            std::cout << Utils::RED << "Invalid task ID: " << args[1] << Utils::RESET << std::endl;
+            std::cout << Utils::RED << std::format(INVALID_TASK_ID_MSG, args[1]) << Utils::RESET << std::endl;
             return;
         }
         
@@ -268,76 +291,52 @@ private:
     
     void handleTag(const std::vector<std::string>& args) {
         if (args.size() != 3) {
-            std::cout << Utils::RED << "Usage: tag <task_ID> <tag>" << Utils::RESET << std::endl;
+            std::cout << Utils::RED << USAGE_TAG_MSG << Utils::RESET << std::endl;
             return;
         }
         
-        if (!Utils::isNumber(args[1])) {
-            std::cout << Utils::RED << "Invalid task ID: " << args[1] << Utils::RESET << std::endl;
-            return;
-        }
+        auto task = validateAndFindTask(args[1]);
+        if (!task) return;
         
-        int id = std::stoi(args[1]);
         std::string tag = args[2];
-        
-        if (auto task = tasks.findTask(id)) {
-            task->addTag(tag);
-            tasks.save();
-            std::cout << Utils::GREEN << "Tag added successfully!" << Utils::RESET << std::endl;
-        } else {
-            std::cout << Utils::RED << "Task with ID " << id << " not found!" << Utils::RESET << std::endl;
-        }
+        task->addTag(tag);
+        tasks.save();
+        std::cout << Utils::GREEN << TAG_ADDED_MSG << Utils::RESET << std::endl;
     }
     
     void handleUntag(const std::vector<std::string>& args) {
         if (args.size() != 3) {
-            std::cout << Utils::RED << "Usage: untag <task_ID> <tag>" << Utils::RESET << std::endl;
+            std::cout << Utils::RED << USAGE_UNTAG_MSG << Utils::RESET << std::endl;
             return;
         }
         
-        if (!Utils::isNumber(args[1])) {
-            std::cout << Utils::RED << "Invalid task ID: " << args[1] << Utils::RESET << std::endl;
-            return;
-        }
+        auto task = validateAndFindTask(args[1]);
+        if (!task) return;
         
-        int id = std::stoi(args[1]);
         std::string tag = args[2];
-        
-        if (auto task = tasks.findTask(id)) {
-            task->removeTag(tag);
-            tasks.save();
-            std::cout << Utils::GREEN << "Tag removed successfully!" << Utils::RESET << std::endl;
-        } else {
-            std::cout << Utils::RED << "Task with ID " << id << " not found!" << Utils::RESET << std::endl;
-        }
+        task->removeTag(tag);
+        tasks.save();
+        std::cout << Utils::GREEN << TAG_REMOVED_MSG << Utils::RESET << std::endl;
     }
     
     void handleDue(const std::vector<std::string>& args) {
         if (args.size() != 3) {
-            std::cout << Utils::RED << "Usage: due <task_ID> <date> (YYYY-MM-DD format)" << Utils::RESET << std::endl;
+            std::cout << Utils::RED << USAGE_DUE_MSG << Utils::RESET << std::endl;
             return;
         }
         
-        if (!Utils::isNumber(args[1])) {
-            std::cout << Utils::RED << "Invalid task ID: " << args[1] << Utils::RESET << std::endl;
-            return;
-        }
-        
-        int id = std::stoi(args[1]);
+        auto task = validateAndFindTask(args[1]);
+        if (!task) return;
         
         auto dueDate = Utils::parseDate(args[2]);
         if (!dueDate) {
-            std::cout << Utils::RED << "Invalid date format. Use YYYY-MM-DD" << Utils::RESET << std::endl;
+            std::cout << Utils::RED << INVALID_DATE_FORMAT_MSG << Utils::RESET << std::endl;
             return;
         }
         
-        if (auto task = tasks.findTask(id)) {
-            task->setDueDate(dueDate);
-            tasks.save();
-            std::cout << Utils::GREEN << "Due date set successfully!" << Utils::RESET << std::endl;
-        } else {
-            std::cout << Utils::RED << "Task with ID " << id << " not found!" << Utils::RESET << std::endl;
-        }
+        task->setDueDate(dueDate);
+        tasks.save();
+        std::cout << Utils::GREEN << DUE_DATE_SET_MSG << Utils::RESET << std::endl;
     }
     
     void handleComplete(const std::vector<std::string>& args) {
@@ -346,15 +345,11 @@ private:
             return;
         }
         
-        if (!Utils::isNumber(args[1])) {
-            std::cout << Utils::RED << "Invalid task ID: " << args[1] << Utils::RESET << std::endl;
-            return;
-        }
-        
         int id = std::stoi(args[1]);
         
         if (auto task = tasks.findTask(id)) {
             task->markCompleted();
+            tasks.save();
             std::cout << Utils::GREEN << "Task marked as completed!" << Utils::RESET << std::endl;
         } else {
             std::cout << Utils::RED << "Task with ID " << id << " not found!" << Utils::RESET << std::endl;

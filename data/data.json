@@ -4,11 +4,15 @@
         {
             "created_at": 1749378803,
             "description": "",
+            "due_date": 1767132000,
             "id": 1,
             "name": "Learn advanced C++20 features",
             "priority": 3,
             "status": 1,
-            "tags": []
+            "tags": [
+                "learning",
+                "refactored"
+            ]
         },
         {
             "completed_at": 1749378803,
@@ -23,11 +27,14 @@
         {
             "created_at": 1749378803,
             "description": "",
+            "due_date": 1752530400,
             "id": 3,
             "name": "Set up CI/CD pipeline",
             "priority": 2,
             "status": 1,
-            "tags": []
+            "tags": [
+                "automation"
+            ]
         },
         {
             "created_at": 1749378803,
