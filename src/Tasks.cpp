@@ -1,4 +1,6 @@
 #include "Tasks.hpp"
+#include "TaskSearchIndex.hpp"
+#include "benchmark.hpp"
 #include "utils.hpp"
 #include <fstream>
 #include <iostream>
@@ -6,6 +8,8 @@
 #include <iomanip>
 #include <ranges>
 #include <format>
+#include <execution>
+#include <future>
 
 Tasks::Tasks(std::filesystem::path dataFile) : nextId(1), dataFile(std::move(dataFile)) {
     loadFromFile();
@@ -15,6 +19,8 @@ TaskResult Tasks::addTask(std::string_view name, TaskStatus status, TaskPriority
     try {
         auto task = std::make_unique<Task>(nextId++, name, status, priority);
         tasks.push_back(std::move(task));
+        index_dirty_ = true; // Mark search index as dirty - Phase 2 optimization
+        stats_dirty_ = true; // Mark statistics as dirty - Phase 2 optimization
         saveToFile();
         return TaskResult::successResult("Task added successfully!");
     } catch (const std::exception& e) {
@@ -38,6 +44,8 @@ TaskResult Tasks::addTask(std::string_view name, std::string_view description,
         }
         
         tasks.push_back(std::move(task));
+        index_dirty_ = true; // Mark search index as dirty - Phase 2 optimization
+        stats_dirty_ = true; // Mark statistics as dirty - Phase 2 optimization
         saveToFile();
         return TaskResult::successResult("Task added successfully!");
     } catch (const std::exception& e) {
@@ -53,6 +61,8 @@ TaskResult Tasks::removeTask(int id) {
     
     if (it != tasks.end()) {
         tasks.erase(it);
+        index_dirty_ = true; // Mark search index as dirty - Phase 2 optimization
+        stats_dirty_ = true; // Mark statistics as dirty - Phase 2 optimization
         saveToFile();
         return TaskResult::successResult("Task removed successfully!");
     }
@@ -66,6 +76,8 @@ TaskResult Tasks::updateTask(int id, std::string_view name, TaskStatus status, T
             task->setName(name);
             task->setStatus(status);
             task->setPriority(priority);
+            index_dirty_ = true; // Mark search index as dirty - Phase 2 optimization
+            stats_dirty_ = true; // Mark statistics as dirty - Phase 2 optimization
             saveToFile();
             return TaskResult::successResult("Task updated successfully!");
         } catch (const std::exception& e) {
@@ -86,6 +98,7 @@ Task* Tasks::findTask(int id) noexcept {
 
 std::vector<Task*> Tasks::searchTasks(std::string_view query) const {
     std::vector<Task*> results;
+    results.reserve(std::min(tasks.size(), size_t{100})); // Reserve reasonable capacity - Phase 1 optimization
     
     for (const auto& task : tasks) {
         if (task->matches(query)) {
@@ -97,12 +110,33 @@ std::vector<Task*> Tasks::searchTasks(std::string_view query) const {
 }
 
 std::vector<Task*> Tasks::getTasksByStatus(TaskStatus status) const {
-    std::vector<Task*> results;
+    BENCHMARK("Get Tasks By Status");
     
-    for (const auto& task : tasks | std::views::filter([status](const auto& t) {
-        return t->getStatus() == status;
-    })) {
-        results.push_back(task.get());
+    std::vector<Task*> results;
+    results.reserve(tasks.size() / 3); // Assume roughly 1/3 of tasks match any given status - Phase 1 optimization
+    
+    // Phase 2 optimization: Use parallel algorithms for large collections
+    if (tasks.size() > 1000) {
+        std::vector<Task*> all_tasks;
+        all_tasks.reserve(tasks.size());
+        
+        for (const auto& task : tasks) {
+            all_tasks.push_back(task.get());
+        }
+        
+        std::copy_if(std::execution::par_unseq,
+                     all_tasks.begin(), all_tasks.end(),
+                     std::back_inserter(results),
+                     [status](const Task* task) {
+                         return task->getStatus() == status;
+                     });
+    } else {
+        // Use serial version for small collections (avoid overhead)
+        for (const auto& task : tasks | std::views::filter([status](const auto& t) {
+            return t->getStatus() == status;
+        })) {
+            results.push_back(task.get());
+        }
     }
     
     return results;
@@ -145,27 +179,65 @@ std::vector<Task*> Tasks::getOverdueTasks() const {
 }
 
 TaskStats Tasks::getStatistics() const {
+    BENCHMARK("Statistics Computation");
+    
+    // Phase 2 optimization: Lazy evaluation of statistics
+    if (!stats_dirty_ && cached_stats_) {
+        return *cached_stats_;
+    }
+    
     TaskStats stats{};
     
-    for (const auto& task : tasks) {
-        ++stats.total;
-        
-        switch (task->getStatus()) {
-            case TaskStatus::TODO: ++stats.todo; break;
-            case TaskStatus::IN_PROGRESS: ++stats.inProgress; break;
-            case TaskStatus::COMPLETED: ++stats.completed; break;
+    // Use parallel algorithms for large collections
+    if (tasks.size() > 500) {
+        std::vector<Task*> task_ptrs;
+        task_ptrs.reserve(tasks.size());
+        for (const auto& task : tasks) {
+            task_ptrs.push_back(task.get());
         }
         
-        switch (task->getPriority()) {
-            case TaskPriority::LOW: ++stats.lowPriority; break;
-            case TaskPriority::MEDIUM: ++stats.mediumPriority; break;
-            case TaskPriority::HIGH: ++stats.highPriority; break;
-        }
-        
-        if (task->isOverdue()) {
-            ++stats.overdue;
+        // Parallel counting
+        stats.total = tasks.size();
+        stats.todo = std::count_if(std::execution::par_unseq, task_ptrs.begin(), task_ptrs.end(),
+                                   [](const Task* t) { return t->getStatus() == TaskStatus::TODO; });
+        stats.inProgress = std::count_if(std::execution::par_unseq, task_ptrs.begin(), task_ptrs.end(),
+                                        [](const Task* t) { return t->getStatus() == TaskStatus::IN_PROGRESS; });
+        stats.completed = std::count_if(std::execution::par_unseq, task_ptrs.begin(), task_ptrs.end(),
+                                       [](const Task* t) { return t->getStatus() == TaskStatus::COMPLETED; });
+        stats.lowPriority = std::count_if(std::execution::par_unseq, task_ptrs.begin(), task_ptrs.end(),
+                                         [](const Task* t) { return t->getPriority() == TaskPriority::LOW; });
+        stats.mediumPriority = std::count_if(std::execution::par_unseq, task_ptrs.begin(), task_ptrs.end(),
+                                            [](const Task* t) { return t->getPriority() == TaskPriority::MEDIUM; });
+        stats.highPriority = std::count_if(std::execution::par_unseq, task_ptrs.begin(), task_ptrs.end(),
+                                          [](const Task* t) { return t->getPriority() == TaskPriority::HIGH; });
+        stats.overdue = std::count_if(std::execution::par_unseq, task_ptrs.begin(), task_ptrs.end(),
+                                     [](const Task* t) { return t->isOverdue(); });
+    } else {
+        // Serial computation for small collections
+        for (const auto& task : tasks) {
+            ++stats.total;
+            
+            switch (task->getStatus()) {
+                case TaskStatus::TODO: ++stats.todo; break;
+                case TaskStatus::IN_PROGRESS: ++stats.inProgress; break;
+                case TaskStatus::COMPLETED: ++stats.completed; break;
+            }
+            
+            switch (task->getPriority()) {
+                case TaskPriority::LOW: ++stats.lowPriority; break;
+                case TaskPriority::MEDIUM: ++stats.mediumPriority; break;
+                case TaskPriority::HIGH: ++stats.highPriority; break;
+            }
+            
+            if (task->isOverdue()) {
+                ++stats.overdue;
+            }
         }
     }
+    
+    // Cache the results
+    cached_stats_ = stats;
+    stats_dirty_ = false;
     
     return stats;
 }
@@ -378,4 +450,107 @@ const Task* Tasks::findTask(int id) const noexcept {
 
 [[nodiscard]] size_t Tasks::size() const noexcept {
     return tasks.size();
+}
+
+// Phase 2 optimization: Search index implementation
+void Tasks::rebuildSearchIndex() const {
+    if (!index_dirty_) return;
+    
+    BENCHMARK("Search Index Rebuild");
+    search_index_.clear();
+    
+    for (const auto& task : tasks) {
+        search_index_.addTask(*task);
+    }
+    
+    index_dirty_ = false;
+}
+
+std::vector<Task*> Tasks::advancedSearch(std::string_view query) const {
+    BENCHMARK("Advanced Search");
+    
+    if (query.empty()) {
+        return {};
+    }
+    
+    // Rebuild index if necessary
+    rebuildSearchIndex();
+    
+    // Use prefix search for better performance
+    auto taskRefs = search_index_.searchPrefix(query);
+    
+    std::vector<Task*> results;
+    results.reserve(taskRefs.size());
+    
+    for (const auto& taskRef : taskRefs) {
+        // Find the corresponding Task* in our tasks vector
+        const Task& task = taskRef.get();
+        auto it = std::ranges::find_if(tasks, [&task](const auto& taskPtr) {
+            return taskPtr.get() == &task;
+        });
+        
+        if (it != tasks.end()) {
+            results.push_back(it->get());
+        }
+    }
+    
+    // Remove duplicates and sort by relevance (task ID for now)
+    std::ranges::sort(results, [](const Task* a, const Task* b) {
+        return a->getId() < b->getId();
+    });
+    
+    results.erase(std::unique(results.begin(), results.end()), results.end());
+    
+    return results;
+}
+
+// Phase 2 optimization: Async file I/O implementation
+void Tasks::saveAsync() const {
+    // Don't start new save if one is in progress
+    if (save_future_.valid() && 
+        save_future_.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+        return;
+    }
+    
+    // Create a copy of tasks for async saving
+    std::vector<std::unique_ptr<Task>> task_copy;
+    task_copy.reserve(tasks.size());
+    
+    for (const auto& task : tasks) {
+        // Create deep copy for async operation
+        auto task_copy_ptr = std::make_unique<Task>(*task);
+        task_copy.push_back(std::move(task_copy_ptr));
+    }
+    
+    std::filesystem::path file_path = dataFile;
+    
+    save_future_ = std::async(std::launch::async, [task_copy = std::move(task_copy), file_path]() {
+        BENCHMARK("Async File Save");
+        
+        try {
+            nlohmann::json jsonArray = nlohmann::json::array();
+            
+            for (const auto& task : task_copy) {
+                jsonArray.push_back(task->toJson());
+            }
+            
+            std::ofstream outFile(file_path);
+            if (!outFile.is_open()) {
+                std::cerr << "Error: Cannot open file for writing: " << file_path << std::endl;
+                return;
+            }
+            
+            outFile << jsonArray.dump(2);
+            outFile.close();
+            
+        } catch (const std::exception& e) {
+            std::cerr << "Error saving tasks asynchronously: " << e.what() << std::endl;
+        }
+    });
+}
+
+void Tasks::waitForSave() const {
+    if (save_future_.valid()) {
+        save_future_.wait();
+    }
 }

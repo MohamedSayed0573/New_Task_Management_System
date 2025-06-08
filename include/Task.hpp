@@ -98,4 +98,8 @@ public:
 [[nodiscard]] int taskStatusToInt(TaskStatus status) noexcept;
 [[nodiscard]] int taskPriorityToInt(TaskPriority priority) noexcept;
 
+// Fast parsing functions using constexpr hashing - Phase 1 optimization
+[[nodiscard]] TaskStatus parseTaskStatusFast(std::string_view statusStr);
+[[nodiscard]] TaskPriority parseTaskPriorityFast(std::string_view priorityStr);
+
 #endif // TASK_HPP

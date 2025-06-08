@@ -24,6 +24,7 @@ std::string trim(std::string_view str) {
 
 std::vector<std::string> split(std::string_view str, char delimiter) {
     std::vector<std::string> tokens;
+    tokens.reserve(8); // Reserve space for typical usage - Phase 1 optimization
     std::stringstream ss{std::string{str}};
     std::string token;
     
@@ -37,8 +38,9 @@ std::vector<std::string> split(std::string_view str, char delimiter) {
 }
 
 std::string toLowerCase(std::string_view str) {
-    std::string result{str};
-    std::ranges::transform(result, result.begin(), 
+    std::string result;
+    result.reserve(str.size());  // Avoid reallocations - Phase 1 optimization
+    std::ranges::transform(str, std::back_inserter(result),
                           [](unsigned char c) { return std::tolower(c); });
     return result;
 }

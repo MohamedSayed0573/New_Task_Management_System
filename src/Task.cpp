@@ -7,6 +7,53 @@
 #include <stdexcept>
 #include <format>
 
+// Compile-time string hashing for fast enum lookups - Phase 1 optimization
+constexpr uint64_t constexpr_hash(std::string_view str) noexcept {
+    uint64_t hash = 14695981039346656037ULL;
+    for (char c : str) {
+        hash ^= static_cast<uint64_t>(c);
+        hash *= 1099511628211ULL;
+    }
+    return hash;
+}
+
+// Fast status parsing using compile-time hash map - Phase 1 optimization
+TaskStatus parseTaskStatusFast(std::string_view statusStr) {
+    switch (constexpr_hash(statusStr)) {
+        case constexpr_hash("todo"):
+        case constexpr_hash("1"):
+            return TaskStatus::TODO;
+        case constexpr_hash("inprogress"):
+        case constexpr_hash("in-progress"):
+        case constexpr_hash("2"):
+            return TaskStatus::IN_PROGRESS;
+        case constexpr_hash("completed"):
+        case constexpr_hash("done"):
+        case constexpr_hash("3"):
+            return TaskStatus::COMPLETED;
+        default:
+            throw std::invalid_argument("Invalid status");
+    }
+}
+
+// Fast priority parsing using compile-time hash map - Phase 1 optimization
+TaskPriority parseTaskPriorityFast(std::string_view priorityStr) {
+    switch (constexpr_hash(priorityStr)) {
+        case constexpr_hash("low"):
+        case constexpr_hash("1"):
+            return TaskPriority::LOW;
+        case constexpr_hash("medium"):
+        case constexpr_hash("med"):
+        case constexpr_hash("2"):
+            return TaskPriority::MEDIUM;
+        case constexpr_hash("high"):
+        case constexpr_hash("3"):
+            return TaskPriority::HIGH;
+        default:
+            throw std::invalid_argument("Invalid priority");
+    }
+}
+
 // Utility functions for enum conversions
 TaskStatus intToTaskStatus(int status) {
     switch (status) {

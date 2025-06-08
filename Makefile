@@ -1,7 +1,30 @@
-# Makefile for To-Do List Manager
+# Makefile for To-Do List Manager - Enhanced with Phase 1 optimizations
 CXX = g++
-CXXFLAGS = -std=c++20 -Wall -Wextra -O2 -Iinclude
-LDFLAGS = 
+CXXFLAGS_BASE = -std=c++23 -Wall -Wextra -Iinclude
+CXXFLAGS_DEBUG = $(CXXFLAGS_BASE) -g -O0 -DDEBUG -fsanitize=address,undefined
+CXXFLAGS_RELEASE = $(CXXFLAGS_BASE) -O3 -DNDEBUG -march=native -flto -ffast-math
+CXXFLAGS_PROFILE = $(CXXFLAGS_RELEASE) -pg -fno-omit-frame-pointer
+
+# Link Time Optimization for release builds
+LDFLAGS_RELEASE = -flto -Wl,--gc-sections -s
+LDFLAGS_DEBUG = -fsanitize=address,undefined
+LDFLAGS_PROFILE = $(LDFLAGS_RELEASE) -pg
+
+# Select build type (default: release)
+BUILD_TYPE ?= release
+ifeq ($(BUILD_TYPE),debug)
+    CXXFLAGS = $(CXXFLAGS_DEBUG)
+    LDFLAGS = $(LDFLAGS_DEBUG)
+else ifeq ($(BUILD_TYPE),profile)
+    CXXFLAGS = $(CXXFLAGS_PROFILE)
+    LDFLAGS = $(LDFLAGS_PROFILE)
+else
+    CXXFLAGS = $(CXXFLAGS_RELEASE)
+    LDFLAGS = $(LDFLAGS_RELEASE)
+endif
+
+# Parallel compilation
+MAKEFLAGS += -j$(shell nproc)
 
 # Directories
 SRCDIR = src

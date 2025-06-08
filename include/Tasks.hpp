@@ -2,6 +2,7 @@
 #define TASKS_HPP
 
 #include "Task.hpp"
+#include "TaskSearchIndex.hpp"
 #include <vector>
 #include <string>
 #include <string_view>
@@ -12,6 +13,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <optional>
+#include <future>
 
 // Task operation result wrapper
 struct TaskResult {
@@ -45,9 +47,23 @@ private:
     int nextId;
     std::filesystem::path dataFile;
     
+    // Phase 2 optimization: Advanced search index
+    mutable TaskSearchIndex search_index_;
+    mutable bool index_dirty_ = true;
+    
+    // Phase 2 optimization: Lazy statistics computation
+    mutable std::optional<TaskStats> cached_stats_;
+    mutable bool stats_dirty_ = true;
+    
+    // Phase 2 optimization: Async file I/O
+    mutable std::future<void> save_future_;
+    
     // Internal helper methods
     void loadFromFile();
     void saveToFile() const;
+    void saveAsync() const;
+    void waitForSave() const;
+    void rebuildSearchIndex() const;
     [[nodiscard]] std::vector<Task*> getSortedTasks() const;
     
 public:
@@ -78,6 +94,7 @@ public:
     [[nodiscard]] Task* findTask(int id) noexcept;
     [[nodiscard]] const Task* findTask(int id) const noexcept;
     [[nodiscard]] std::vector<Task*> searchTasks(std::string_view query) const;
+    [[nodiscard]] std::vector<Task*> advancedSearch(std::string_view query) const; // Phase 2: Advanced search using index
     [[nodiscard]] std::vector<Task*> getTasksByStatus(TaskStatus status) const;
     [[nodiscard]] std::vector<Task*> getTasksByPriority(TaskPriority priority) const;
     [[nodiscard]] std::vector<Task*> getTasksByTag(std::string_view tag) const;
