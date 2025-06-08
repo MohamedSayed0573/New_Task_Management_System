@@ -1,0 +1,256 @@
+# C++20/23 Todo Application - Git Ignore File
+# ==================================================
+
+# Compiled Object files
+*.o
+*.obj
+*.lo
+*.slo
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.a
+*.lib
+*.la
+
+# Executables
+*.exe
+*.out
+*.app
+todo
+todo.exe
+
+# Build directories
+build/
+bin/
+obj/
+.build/
+cmake-build-*/
+
+# Make generated files
+*.d
+*.dep
+.deps/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+Testing/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+_deps
+
+# Ninja build files
+.ninja_deps
+.ninja_log
+build.ninja
+
+# Conan package manager
+conandata.txt
+conaninfo.txt
+conanbuildinfo.*
+conan.lock
+
+# vcpkg
+vcpkg_installed/
+
+# Visual Studio / Visual Studio Code
+.vs/
+.vscode/
+*.vcxproj*
+*.sln
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Visual Studio Code workspace settings (keep project settings)
+.vscode/settings.json
+.vscode/tasks.json
+.vscode/launch.json
+.vscode/extensions.json
+.vscode/c_cpp_properties.json
+
+# Qt Creator
+CMakeLists.txt.user*
+*.pro.user*
+*.qbs.user*
+*.creator
+*.creator.user*
+
+# CLion / IntelliJ
+.idea/
+cmake-build-*/
+*.iml
+*.ipr
+*.iws
+
+# Xcode
+*.xcodeproj/
+*.xcworkspace/
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# GDB history
+.gdb_history
+
+# Valgrind output
+vgcore.*
+*.valgrind
+
+# Core dumps
+core
+core.*
+*.core
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.#*
+\#*#
+
+# Log files
+*.log
+*.out
+*.err
+
+# Data files (exclude application data but keep structure)
+# Uncomment the following if you want to ignore data files:
+# data/*.json
+# data/*.db
+# data/*.sqlite*
+
+# Backup files
+*.bak
+*.backup
+*.orig
+
+# Package files
+*.tar.gz
+*.zip
+*.7z
+*.rar
+
+# Documentation generated files
+doc/html/
+doc/latex/
+docs/_build/
+*.pdf
+*.ps
+
+# Test output
+test_results/
+coverage/
+*.gcov
+*.gcno
+*.gcda
+*.info
+
+# Profiling output
+gmon.out
+*.prof
+perf.data*
+
+# Memory debugging
+*.asan
+*.msan
+*.tsan
+*.ubsan
+
+# OS specific files
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+*.lnk
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Editor temporary files
+*.kate-swp
+.*.swp
+.*.swo
+
+# Tags files
+tags
+TAGS
+.tags
+.TAGS
+
+# Cache directories
+.cache/
+__pycache__/
+*.pyc
+
+# Node.js (if using any JS tooling)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python (if using any Python tooling)
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Rust (if mixing with Rust components)
+target/
+Cargo.lock
+
+# Go (if mixing with Go components)
+vendor/
+
+# Project specific ignores
+# Add any project-specific files/directories to ignore below:
+
+# Uncomment if you want to ignore generated documentation
+# *.md.backup
+# docs/generated/
+
+# Uncomment if you want to ignore specific config files
+# config/*.local
+# *.local.conf
