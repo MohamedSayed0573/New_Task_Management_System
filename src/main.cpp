@@ -282,6 +282,7 @@ private:
         
         if (auto task = tasks.findTask(id)) {
             task->addTag(tag);
+            tasks.save();
             std::cout << Utils::GREEN << "Tag added successfully!" << Utils::RESET << std::endl;
         } else {
             std::cout << Utils::RED << "Task with ID " << id << " not found!" << Utils::RESET << std::endl;
@@ -304,6 +305,7 @@ private:
         
         if (auto task = tasks.findTask(id)) {
             task->removeTag(tag);
+            tasks.save();
             std::cout << Utils::GREEN << "Tag removed successfully!" << Utils::RESET << std::endl;
         } else {
             std::cout << Utils::RED << "Task with ID " << id << " not found!" << Utils::RESET << std::endl;
@@ -331,6 +333,7 @@ private:
         
         if (auto task = tasks.findTask(id)) {
             task->setDueDate(dueDate);
+            tasks.save();
             std::cout << Utils::GREEN << "Due date set successfully!" << Utils::RESET << std::endl;
         } else {
             std::cout << Utils::RED << "Task with ID " << id << " not found!" << Utils::RESET << std::endl;

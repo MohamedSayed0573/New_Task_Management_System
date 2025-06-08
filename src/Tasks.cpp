@@ -170,6 +170,10 @@ TaskStats Tasks::getStatistics() const {
     return stats;
 }
 
+void Tasks::save() const {
+    saveToFile();
+}
+
 void Tasks::showAllTasks() const {
     if (tasks.empty()) {
         std::cout << Utils::YELLOW << "No tasks found!" << Utils::RESET << std::endl;

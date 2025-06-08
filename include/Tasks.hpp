@@ -86,6 +86,9 @@ public:
     // Statistics
     [[nodiscard]] TaskStats getStatistics() const;
     
+    // Data persistence
+    void save() const;
+    
     // Display methods with enhanced formatting
     void showAllTasks() const;
     void showFilteredTasks(TaskStatus status) const;

@@ -1,75 +1,40 @@
 {
-    "nextId": 9,
+    "nextId": 6,
     "tasks": [
         {
-            "created_at": 1749376697,
+            "created_at": 1749378803,
             "description": "",
             "id": 1,
-            "name": "Implement advanced C++20 features",
+            "name": "Learn advanced C++20 features",
             "priority": 3,
-            "status": 2,
+            "status": 1,
             "tags": []
         },
         {
-            "created_at": 1749376697,
+            "completed_at": 1749378803,
+            "created_at": 1749378803,
             "description": "",
             "id": 2,
-            "name": "Write comprehensive unit tests",
+            "name": "Complete comprehensive documentation",
+            "priority": 2,
+            "status": 3,
+            "tags": []
+        },
+        {
+            "created_at": 1749378803,
+            "description": "",
+            "id": 3,
+            "name": "Set up CI/CD pipeline",
             "priority": 2,
             "status": 1,
             "tags": []
         },
         {
-            "created_at": 1749376697,
-            "description": "",
-            "id": 3,
-            "name": "Update documentation",
-            "priority": 1,
-            "status": 1,
-            "tags": []
-        },
-        {
-            "created_at": 1749376697,
-            "description": "",
-            "id": 4,
-            "name": "Setup development environment",
-            "priority": 3,
-            "status": 3,
-            "tags": []
-        },
-        {
-            "created_at": 1749376697,
+            "created_at": 1749378803,
             "description": "",
             "id": 5,
-            "name": "Code review and optimization",
+            "name": "Deploy to production",
             "priority": 3,
-            "status": 1,
-            "tags": []
-        },
-        {
-            "created_at": 1749376975,
-            "description": "",
-            "id": 6,
-            "name": "Test new task",
-            "priority": 1,
-            "status": 1,
-            "tags": []
-        },
-        {
-            "created_at": 1749376986,
-            "description": "",
-            "id": 7,
-            "name": "Test task",
-            "priority": 1,
-            "status": 1,
-            "tags": []
-        },
-        {
-            "created_at": 1749376997,
-            "description": "",
-            "id": 8,
-            "name": "Another test task",
-            "priority": 1,
             "status": 1,
             "tags": []
         }
