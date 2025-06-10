@@ -7,8 +7,6 @@
 #include <iomanip>
 #include <ranges>
 #include <format>
-#include <execution>
-#include <future>
 
 // Constructor: Initialize task manager with data file path and load existing tasks
 Tasks::Tasks(std::filesystem::path dataFile) : nextId(1), dataFile(std::move(dataFile)) {
@@ -585,67 +583,6 @@ std::vector<Task*> Tasks::advancedSearch(std::string_view query) const {
     results.erase(std::unique(results.begin(), results.end()), results.end());
 
     return results;
-}
-
-// Phase 2 optimization: Async file I/O implementation
-void Tasks::saveAsync() const {
-    // Prevent concurrent save operations by checking if one is already in progress
-    if (save_future_.valid() &&
-        save_future_.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
-        return;
-    }
-
-    // Create deep copies of all tasks for thread-safe async operation
-    // This prevents data races when the main thread modifies tasks while saving
-    std::vector<std::unique_ptr<Task>> task_copy;
-    task_copy.reserve(tasks.size());
-
-    for (const auto& task : tasks) {
-        // Create deep copy for async operation
-        auto task_copy_ptr = std::make_unique<Task>(*task);
-        task_copy.push_back(std::move(task_copy_ptr));
-    }
-
-    std::filesystem::path file_path = dataFile;
-
-    // Launch async save operation - tasks are saved in background thread
-    save_future_ = std::async(std::launch::async, [task_copy = std::move(task_copy), file_path]() {
-        try {
-            // Ensure parent directory exists before writing
-            std::filesystem::create_directories(file_path.parent_path());
-
-            // Build JSON structure with task data and metadata
-            nlohmann::json j{
-                {"nextId", 1}, // This would need to be passed properly in a real implementation
-                {"tasks", nlohmann::json::array()}
-            };
-
-            // Convert all tasks to JSON format
-            for (const auto& task : task_copy) {
-                j["tasks"].push_back(task->toJson());
-            }
-
-            // Write to file with proper formatting
-            std::ofstream file(file_path);
-            if (!file.is_open()) {
-                std::cerr << "Error: Cannot open file for writing: " << file_path << std::endl;
-                return;
-            }
-
-            // Write with 4-space indentation for readability
-            file << j.dump(4);
-        }
-        catch (const std::exception& e) {
-            std::cerr << "Error saving tasks asynchronously: " << e.what() << std::endl;
-        }
-        });
-}
-
-// Block execution until any pending save operation completes
-void Tasks::waitForSave() const {
-    if (save_future_.valid()) {
-        save_future_.wait();
-    }
 }
 
 /*

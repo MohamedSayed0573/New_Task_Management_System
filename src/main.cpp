@@ -843,9 +843,9 @@ public:
         command_handlers_["untag"] = [this](CommandLineParser& p) { this->handleUntagCommand(p); };
         command_handlers_["due"] = [this](CommandLineParser& p) { this->handleDueDateCommand(p); };
         command_handlers_["deadline"] = [this](CommandLineParser& p) { this->handleDueDateCommand(p); };
-        command_handlers_["stats"] = [this](CommandLineParser& p) { this->handleStatsCommand(); }; // Note: handleStatsCommand takes no parser
-        command_handlers_["statistics"] = [this](CommandLineParser& p) { this->handleStatsCommand(); };
-        command_handlers_["overdue"] = [this](CommandLineParser& p) { this->handleOverdueCommand(); }; // Note: handleOverdueCommand takes no parser
+        command_handlers_["stats"] = [this](CommandLineParser&) { this->handleStatsCommand(); }; // Note: handleStatsCommand takes no parser
+        command_handlers_["statistics"] = [this](CommandLineParser&) { this->handleStatsCommand(); };
+        command_handlers_["overdue"] = [this](CommandLineParser&) { this->handleOverdueCommand(); }; // Note: handleOverdueCommand takes no parser
     }
 
     /**

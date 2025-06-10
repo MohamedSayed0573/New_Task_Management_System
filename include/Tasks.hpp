@@ -3,7 +3,7 @@
  * @brief Tasks container class with advanced features and optimizations
  *
  * This header defines the Tasks class which manages a collection of Task objects.
- * Includes modern C++ features like async I/O, search indexing, statistics caching,
+ * Includes modern C++ features like search indexing, statistics caching,
  * and comprehensive task management functionality.
  */
 
@@ -22,7 +22,6 @@
 #include <algorithm>
 #include <filesystem>
 #include <optional>
-#include <future>
 
  /**
   * @struct TaskResult
@@ -80,13 +79,11 @@ struct TaskStats {
  * - CRUD operations for tasks
  * - Advanced search and filtering capabilities
  * - Statistics computation with caching
- * - Asynchronous file I/O for performance
  * - Multiple display formats and export options
  *
  * Phase 2 optimizations include:
  * - Search index for fast queries
  * - Lazy statistics computation
- * - Async file operations
  * - Memory-efficient operations
  */
 class Tasks {
@@ -109,16 +106,12 @@ private:
     mutable std::optional<TaskStats> cached_stats_; ///< Cached statistics to avoid recomputation
     mutable bool stats_dirty_ = true;               ///< Flag to recalculate stats when needed
 
-    mutable std::future<void> save_future_;      ///< Future object for async file operations
-
     // ===================
     // Internal Helper Methods
     // ===================
 
     void loadFromFile();                         ///< Load tasks from JSON file
     void saveToFile() const;                     ///< Synchronous save to JSON file
-    void saveAsync() const;                      ///< Asynchronous save to JSON file
-    void waitForSave() const;                    ///< Wait for pending async save to complete
     void rebuildSearchIndex() const;             ///< Rebuild search index when dirty
     [[nodiscard]] std::vector<Task*> getSortedTasks() const; ///< Get tasks sorted by priority and due date
 
@@ -202,7 +195,7 @@ public:
     // Data Persistence
     // =================
 
-    void save() const;                                                                  ///< Save tasks to file (sync or async)
+    void save() const;                                                                  ///< Save tasks to file
 
     // ====================================
     // Display Methods with Enhanced Formatting
