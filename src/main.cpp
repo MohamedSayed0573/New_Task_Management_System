@@ -20,6 +20,8 @@
 #include <algorithm>
 #include <functional> // Added for std::function
 #include <unordered_map> // Added for std::unordered_map
+#include <unordered_set> // Added for std::unordered_set
+#include <optional>      // Added for std::optional
 
  /**
   * @class CommandLineParser
@@ -33,8 +35,12 @@
   */
 class CommandLineParser {
 private:
-    std::vector<std::string> args_;     ///< Stored command-line arguments
-    size_t current_arg_ = 0;           ///< Current position in argument list
+    std::vector<std::string> args_;             ///< Stored command-line arguments
+    std::vector<std::string> positional_args_; ///< Non-option arguments after command
+    std::unordered_map<std::string, std::string> options_; ///< Parsed options with values
+    std::unordered_set<std::string> flags_;     ///< Boolean flags (options without values)
+    size_t current_arg_ = 0;                   ///< Current position in argument list
+    bool parsed_ = false;                      ///< Whether arguments have been parsed
 
 public:
     /**
@@ -48,40 +54,72 @@ public:
         for (int i = 0; i < argc; ++i) {
             args_.emplace_back(argv[i]);
         }
+        parseArguments();
     }
+
+private:
+    /**
+     * @brief Parse all arguments into options and positional arguments
+     */
+    void parseArguments() {
+        if (parsed_ || args_.size() < 2) return;
+        
+        // Skip program name and command
+        for (size_t i = 2; i < args_.size(); ++i) {
+            const auto& arg = args_[i];
+            
+            if (isOption(arg)) {
+                // Handle option with potential value
+                if (i + 1 < args_.size() && !isOption(args_[i + 1])) {
+                    // Option with value
+                    options_[arg] = args_[i + 1];
+                    ++i; // Skip the value
+                } else {
+                    // Boolean flag
+                    flags_.insert(arg);
+                }
+            } else {
+                // Positional argument
+                positional_args_.push_back(arg);
+            }
+        }
+        parsed_ = true;
+    }
+
+public:
 
     // ========================
     // Argument Navigation
     // ========================
 
     /**
-     * @brief Check if more arguments are available
-     * @return true if more arguments exist
+     * @brief Check if more positional arguments are available
+     * @return true if more positional arguments exist
      */
     [[nodiscard]] bool hasMoreArgs() const noexcept {
-        return current_arg_ < args_.size();
+        return current_arg_ < positional_args_.size();
     }
 
     /**
-     * @brief Peek at next argument without consuming it
+     * @brief Peek at next positional argument without consuming it
      * @return Next argument or empty string if none available
      */
     [[nodiscard]] std::string_view peekArg() const {
-        if (current_arg_ >= args_.size()) {
+        if (current_arg_ >= positional_args_.size()) {
             return "";
         }
-        return args_[current_arg_];
+        return positional_args_[current_arg_];
     }
 
     /**
-     * @brief Get next argument and advance position
+     * @brief Get next positional argument and advance position
      * @return Next argument or empty string if none available
      */
     [[nodiscard]] std::string_view nextArg() {
-        if (current_arg_ >= args_.size()) {
+        if (current_arg_ >= positional_args_.size()) {
             return "";
         }
-        return args_[current_arg_++];
+        return positional_args_[current_arg_++];
     }
 
     /**
@@ -92,7 +130,7 @@ public:
         if (args_.size() < 2) {
             return "";
         }
-        current_arg_ = 2; // Skip program name and position after command
+        current_arg_ = 0; // Reset to start of positional args
         return args_[1];
     }
 
@@ -114,22 +152,21 @@ public:
      * @param option Option name to search for
      * @return Option value or empty string if not found
      */
-    [[nodiscard]] std::string_view getOptionValue(std::string_view option) {
-        for (size_t i = current_arg_; i < args_.size(); ++i) {
-            if (args_[i] == option && i + 1 < args_.size()) {
-                return args_[i + 1];
-            }
+    [[nodiscard]] std::string_view getOptionValue(std::string_view option) const {
+        auto it = options_.find(std::string(option));
+        if (it != options_.end()) {
+            return it->second;
         }
         return "";
     }
 
     /**
-     * @brief Check if a specific option exists
+     * @brief Check if a specific option exists (with or without value)
      * @param option Option name to check
      * @return true if option is present
      */
     [[nodiscard]] bool hasOption(std::string_view option) const {
-        return std::find(args_.begin() + 1, args_.end(), option) != args_.end();
+        return options_.contains(std::string(option)) || flags_.contains(std::string(option));
     }
 
     /**
@@ -147,10 +184,10 @@ public:
     }
 
     /**
-     * @brief Reset parser position to after command
+     * @brief Reset parser position to start of positional arguments
      */
     void reset() noexcept {
-        current_arg_ = 2; // Reset to after program name and command
+        current_arg_ = 0; // Reset to start of positional args
     }
 };
 
@@ -323,16 +360,27 @@ private:
     void handleAddCommand(CommandLineParser& parser) {
         parser.reset();
 
-        // Validate required task name
+        // Validate required task name (first positional argument)
         if (!parser.hasMoreArgs()) {
             std::cout << Utils::RED << "Error: Task name is required" << Utils::RESET << std::endl;
             std::cout << "Usage: todo add <name> [options]" << std::endl;
+            std::cout << "Options:" << std::endl;
+            std::cout << "  -s, --status <status>     Task status (todo|inprogress|completed)" << std::endl;
+            std::cout << "  -p, --priority <priority> Task priority (low|medium|high)" << std::endl;
+            std::cout << "  -d, --description <desc>  Task description" << std::endl;
+            std::cout << "  --due <date>              Due date (YYYY-MM-DD)" << std::endl;
+            std::cout << "  -t, --tags <tags>         Comma-separated tags" << std::endl;
+            std::cout << std::endl;
+            std::cout << "Examples:" << std::endl;
+            std::cout << "  todo add \"Learn C++\"" << std::endl;
+            std::cout << "  todo add --priority high \"Important task\" --due 2024-12-31" << std::endl;
+            std::cout << "  todo add \"My task\" -s inprogress -p medium -t work,coding" << std::endl;
             return;
         }
 
         std::string name{ parser.nextArg() };
 
-        // Parse optional parameters with defaults
+        // Parse optional parameters with defaults (now order-independent)
         std::string status_str = getOptionValueWithFallback(parser, "-s", "--status");
         if (status_str.empty()) status_str = "todo";
 
@@ -350,10 +398,6 @@ private:
         }
 
         try {
-            if (!config_.quiet) {
-                std::cout << Utils::CYAN << "Adding new task..." << Utils::RESET << std::endl;
-            }
-
             // Parse and validate status/priority
             TaskStatus status = Utils::parseTaskStatus(status_str);
             TaskPriority priority = Utils::parseTaskPriority(priority_str);

@@ -1,4 +1,40 @@
 {
-    "nextId": 38,
-    "tasks": []
+    "nextId": 41,
+    "tasks": [
+        {
+            "created_at": 1749589399,
+            "description": "",
+            "due_date": 1749938400,
+            "id": 38,
+            "name": "My new task",
+            "priority": 3,
+            "status": 1,
+            "tags": []
+        },
+        {
+            "created_at": 1749589416,
+            "description": "",
+            "id": 39,
+            "name": "Another task",
+            "priority": 2,
+            "status": 2,
+            "tags": [
+                "work",
+                "urgent"
+            ]
+        },
+        {
+            "created_at": 1749589432,
+            "description": "A comprehensive test",
+            "due_date": 1751320800,
+            "id": 40,
+            "name": "Testing flexible parsing",
+            "priority": 3,
+            "status": 1,
+            "tags": [
+                "testing",
+                "enhancement"
+            ]
+        }
+    ]
 }
