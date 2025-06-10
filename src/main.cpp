@@ -18,6 +18,8 @@
 #include <string>
 #include <string_view>
 #include <algorithm>
+#include <functional> // Added for std::function
+#include <unordered_map> // Added for std::unordered_map
 
  /**
   * @class CommandLineParser
@@ -166,6 +168,7 @@ public:
 class TodoApplication {
 private:
     std::unique_ptr<Tasks> tasks_;    ///< Main task container
+    std::unordered_map<std::string, std::function<void(CommandLineParser&)>> command_handlers_; ///< Command dispatcher
 
     /**
      * @struct Config
@@ -607,18 +610,13 @@ private:
     void handleDetailCommand(CommandLineParser& parser) {
         parser.reset();
 
-        if (!parser.hasMoreArgs()) {
-            std::cout << Utils::RED << "Error: Task ID is required" << Utils::RESET << std::endl;
-            std::cout << "Usage: todo detail <id>" << std::endl;
+        auto id_opt = parseTaskId(parser, "detail");
+        if (!id_opt) {
+            // parseTaskId already prints error messages for missing or invalid ID.
             return;
         }
 
-        auto id_str = parser.nextArg();
-        if (!Utils::isNumber(id_str)) {
-            std::cout << Utils::RED << "Error: Invalid task ID" << Utils::RESET << std::endl;
-            return;
-        }
-        int id = std::stoi(std::string{ id_str });
+        int id = *id_opt;
 
         try {
             tasks_->showTaskDetails(id);
@@ -825,6 +823,29 @@ public:
      */
     TodoApplication() {
         tasks_ = std::make_unique<Tasks>(config_.data_file);
+
+        // Initialize command handlers
+        command_handlers_["add"] = [this](CommandLineParser& p) { this->handleAddCommand(p); };
+        command_handlers_["list"] = [this](CommandLineParser& p) { this->handleListCommand(p); };
+        command_handlers_["ls"] = [this](CommandLineParser& p) { this->handleListCommand(p); };
+        command_handlers_["update"] = [this](CommandLineParser& p) { this->handleUpdateCommand(p); };
+        command_handlers_["remove"] = [this](CommandLineParser& p) { this->handleRemoveCommand(p); };
+        command_handlers_["rm"] = [this](CommandLineParser& p) { this->handleRemoveCommand(p); };
+        command_handlers_["delete"] = [this](CommandLineParser& p) { this->handleRemoveCommand(p); };
+        command_handlers_["search"] = [this](CommandLineParser& p) { this->handleSearchCommand(p); };
+        command_handlers_["find"] = [this](CommandLineParser& p) { this->handleSearchCommand(p); };
+        command_handlers_["detail"] = [this](CommandLineParser& p) { this->handleDetailCommand(p); };
+        command_handlers_["show"] = [this](CommandLineParser& p) { this->handleDetailCommand(p); };
+        command_handlers_["info"] = [this](CommandLineParser& p) { this->handleDetailCommand(p); };
+        command_handlers_["complete"] = [this](CommandLineParser& p) { this->handleCompleteCommand(p); };
+        command_handlers_["done"] = [this](CommandLineParser& p) { this->handleCompleteCommand(p); };
+        command_handlers_["tag"] = [this](CommandLineParser& p) { this->handleTagCommand(p); };
+        command_handlers_["untag"] = [this](CommandLineParser& p) { this->handleUntagCommand(p); };
+        command_handlers_["due"] = [this](CommandLineParser& p) { this->handleDueDateCommand(p); };
+        command_handlers_["deadline"] = [this](CommandLineParser& p) { this->handleDueDateCommand(p); };
+        command_handlers_["stats"] = [this](CommandLineParser& p) { this->handleStatsCommand(); }; // Note: handleStatsCommand takes no parser
+        command_handlers_["statistics"] = [this](CommandLineParser& p) { this->handleStatsCommand(); };
+        command_handlers_["overdue"] = [this](CommandLineParser& p) { this->handleOverdueCommand(); }; // Note: handleOverdueCommand takes no parser
     }
 
     /**
@@ -860,41 +881,10 @@ public:
 
         try {
             // Route command to appropriate handler
-            if (command == "add") {
-                handleAddCommand(parser);
-            }
-            else if (command == "list" || command == "ls") {
-                handleListCommand(parser);
-            }
-            else if (command == "update") {
-                handleUpdateCommand(parser);
-            }
-            else if (command == "remove" || command == "rm" || command == "delete") {
-                handleRemoveCommand(parser);
-            }
-            else if (command == "search" || command == "find") {
-                handleSearchCommand(parser);
-            }
-            else if (command == "detail" || command == "show" || command == "info") {
-                handleDetailCommand(parser);
-            }
-            else if (command == "complete" || command == "done") {
-                handleCompleteCommand(parser);
-            }
-            else if (command == "tag") {
-                handleTagCommand(parser);
-            }
-            else if (command == "untag") {
-                handleUntagCommand(parser);
-            }
-            else if (command == "due" || command == "deadline") {
-                handleDueDateCommand(parser);
-            }
-            else if (command == "stats" || command == "statistics") {
-                handleStatsCommand();
-            }
-            else if (command == "overdue") {
-                handleOverdueCommand();
+            auto command_str = std::string{ command };
+            auto it = command_handlers_.find(command_str);
+            if (it != command_handlers_.end()) {
+                it->second(parser); // Call the handler
             }
             else {
                 std::cout << Utils::RED << "Error: Unknown command '" << command << "'" << Utils::RESET << std::endl;

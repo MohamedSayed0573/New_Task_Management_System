@@ -8,6 +8,13 @@ set -e
 echo "📋 Todo Application Installer"
 echo "=============================="
 
+# Check if make is available
+if ! command -v make &> /dev/null
+then
+    echo "Error: make command could not be found. Please install it."
+    exit 1
+fi
+
 # Check if running as root for system-wide install
 if [ "$EUID" -eq 0 ]; then
     INSTALL_DIR="/usr/local/bin"
