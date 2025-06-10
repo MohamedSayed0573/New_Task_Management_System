@@ -1,3 +1,14 @@
+/**
+ * @file main.cpp
+ * @brief Main application entry point for the Todo List Manager
+ *
+ * This file contains the main application logic including:
+ * - Custom command-line parser for handling user input
+ * - TodoApplication class with comprehensive command handlers
+ * - Modern C++ features and error handling
+ * - Extensive help system and usage information
+ */
+
 #include "Tasks.hpp"
 #include "utils.hpp"
 #include <iostream>
@@ -8,27 +19,51 @@
 #include <string_view>
 #include <algorithm>
 
-/**
- * Modern CLI application for todo task management
- * Custom command-line parser without external dependencies
- */
+ /**
+  * @class CommandLineParser
+  * @brief Custom command-line argument parser without external dependencies
+  *
+  * Provides comprehensive parsing of command-line arguments including:
+  * - Command extraction and validation
+  * - Option parsing with short and long forms
+  * - Argument validation and type checking
+  * - Support for complex option patterns
+  */
 class CommandLineParser {
 private:
-    std::vector<std::string> args_;
-    size_t current_arg_ = 0;
+    std::vector<std::string> args_;     ///< Stored command-line arguments
+    size_t current_arg_ = 0;           ///< Current position in argument list
 
 public:
+    /**
+     * @brief Construct parser from command-line arguments
+     * @param argc Number of arguments
+     * @param argv Array of argument strings
+     */
     explicit CommandLineParser(int argc, char* argv[]) {
         args_.reserve(argc);
+        // Store all arguments for processing
         for (int i = 0; i < argc; ++i) {
             args_.emplace_back(argv[i]);
         }
     }
 
+    // ========================
+    // Argument Navigation
+    // ========================
+
+    /**
+     * @brief Check if more arguments are available
+     * @return true if more arguments exist
+     */
     [[nodiscard]] bool hasMoreArgs() const noexcept {
         return current_arg_ < args_.size();
     }
 
+    /**
+     * @brief Peek at next argument without consuming it
+     * @return Next argument or empty string if none available
+     */
     [[nodiscard]] std::string_view peekArg() const {
         if (current_arg_ >= args_.size()) {
             return "";
@@ -36,6 +71,10 @@ public:
         return args_[current_arg_];
     }
 
+    /**
+     * @brief Get next argument and advance position
+     * @return Next argument or empty string if none available
+     */
     [[nodiscard]] std::string_view nextArg() {
         if (current_arg_ >= args_.size()) {
             return "";
@@ -43,18 +82,36 @@ public:
         return args_[current_arg_++];
     }
 
+    /**
+     * @brief Extract command from arguments (assumes position 1)
+     * @return Command string or empty if not available
+     */
     [[nodiscard]] std::string_view getCommand() {
         if (args_.size() < 2) {
             return "";
         }
-        current_arg_ = 2; // Skip program name and get command
+        current_arg_ = 2; // Skip program name and position after command
         return args_[1];
     }
 
+    // ===================
+    // Option Processing
+    // ===================
+
+    /**
+     * @brief Check if argument is an option (starts with -)
+     * @param arg Argument to check
+     * @return true if argument is an option
+     */
     [[nodiscard]] bool isOption(std::string_view arg) const noexcept {
         return arg.starts_with("-");
     }
 
+    /**
+     * @brief Get value for a specific option
+     * @param option Option name to search for
+     * @return Option value or empty string if not found
+     */
     [[nodiscard]] std::string_view getOptionValue(std::string_view option) {
         for (size_t i = current_arg_; i < args_.size(); ++i) {
             if (args_[i] == option && i + 1 < args_.size()) {
@@ -64,10 +121,20 @@ public:
         return "";
     }
 
+    /**
+     * @brief Check if a specific option exists
+     * @param option Option name to check
+     * @return true if option is present
+     */
     [[nodiscard]] bool hasOption(std::string_view option) const {
         return std::find(args_.begin() + 1, args_.end(), option) != args_.end();
     }
 
+    /**
+     * @brief Parse comma-separated tags from option value
+     * @param option Option name containing tag list
+     * @return Vector of individual tags
+     */
     [[nodiscard]] std::vector<std::string> getTagsFromOption(std::string_view option) {
         std::vector<std::string> tags;
         auto value = getOptionValue(option);
@@ -77,22 +144,46 @@ public:
         return tags;
     }
 
+    /**
+     * @brief Reset parser position to after command
+     */
     void reset() noexcept {
         current_arg_ = 2; // Reset to after program name and command
     }
 };
 
+/**
+ * @class TodoApplication
+ * @brief Main application class handling all todo operations
+ *
+ * Provides a comprehensive interface for todo management including:
+ * - All CRUD operations for tasks
+ * - Advanced search and filtering
+ * - Statistics and reporting
+ * - Multiple output formats
+ * - Comprehensive error handling
+ */
 class TodoApplication {
 private:
-    std::unique_ptr<Tasks> tasks_;
+    std::unique_ptr<Tasks> tasks_;    ///< Main task container
 
-    // Application configuration
+    /**
+     * @struct Config
+     * @brief Application configuration settings
+     */
     struct Config {
-        std::string data_file = "data/data.json";
-        bool verbose = false;
-        bool quiet = false;
+        std::string data_file = "data/data.json";  ///< Path to data file
+        bool verbose = false;                      ///< Enable verbose output
+        bool quiet = false;                        ///< Suppress non-essential output
     } config_;
 
+    // ==================
+    // Help and Usage
+    // ==================
+
+    /**
+     * @brief Display comprehensive usage information
+     */
     void printUsage() const {
         std::cout << Utils::BOLD << "📋 To-Do List Manager v2.0 - Enhanced Edition" << Utils::RESET << "\n\n";
 
@@ -117,7 +208,8 @@ private:
 
         std::cout << "  🔄 update <id> <name> <status> <priority>  Modify existing task\n\n";
 
-        std::cout << "  🗑️  remove <id>                   Delete a task (aliases: rm, delete)\n\n";
+        std::cout << "  🗑️  remove <id>                   Delete a task (aliases: rm, delete)\n";
+        std::cout << "     Options: --all (remove all tasks with confirmation)\n\n";
 
         std::cout << "  🔍 search <query>                 Find tasks (aliases: find)\n\n";
 
@@ -147,13 +239,21 @@ private:
         std::cout << "  Date format: YYYY-MM-DD (e.g., 2025-12-31)\n";
     }
 
+    /**
+     * @brief Display version information
+     */
     void printVersion() const {
         std::cout << "To-Do List Manager v2.0.0 Enhanced Edition\n";
         std::cout << "Built with C++20/23 (No external dependencies)\n";
         std::cout << "Copyright (c) 2025 - Task Management System\n";
     }
 
+    /**
+     * @brief Parse and apply global command-line options
+     * @param parser Command line parser instance
+     */
     void parseGlobalOptions(CommandLineParser& parser) {
+        // Handle custom data file option
         if (parser.hasOption("--data-file")) {
             auto dataFile = parser.getOptionValue("--data-file");
             if (!dataFile.empty()) {
@@ -162,11 +262,22 @@ private:
             }
         }
 
+        // Set verbosity flags
         config_.verbose = parser.hasOption("-v") || parser.hasOption("--verbose");
         config_.quiet = parser.hasOption("-q") || parser.hasOption("--quiet");
     }
 
-    // Helper method to get option value with fallback
+    // =======================
+    // Helper Utility Methods
+    // =======================
+
+    /**
+     * @brief Get option value with fallback to alternative option name
+     * @param parser Command line parser
+     * @param short_opt Short option name (e.g., "-p")
+     * @param long_opt Long option name (e.g., "--priority")
+     * @return Option value or empty string if not found
+     */
     std::string getOptionValueWithFallback(CommandLineParser& parser,
         std::string_view short_opt,
         std::string_view long_opt = "") {
@@ -177,27 +288,39 @@ private:
         return std::string{ value };
     }
 
-    // Helper method to parse and validate task ID
+    /**
+     * @brief Parse and validate task ID from arguments
+     * @param parser Command line parser
+     * @param command_name Name of current command (for error messages)
+     * @return Optional task ID if valid, nullopt otherwise
+     */
     std::optional<int> parseTaskId(CommandLineParser& parser, std::string_view command_name) {
         if (!parser.hasMoreArgs()) {
-            std::cout << Utils::RED << "Error: Task ID is required" << Utils::RESET << std::endl;
-            std::cout << "Usage: todo " << command_name << " <id> ..." << std::endl;
+            std::cout << Utils::RED << "Error: Task ID is required for " << command_name << Utils::RESET << std::endl;
             return std::nullopt;
         }
 
         auto id_str = parser.nextArg();
         if (!Utils::isNumber(id_str)) {
-            std::cout << Utils::RED << "Error: Invalid task ID" << Utils::RESET << std::endl;
+            std::cout << Utils::RED << "Error: Invalid task ID for " << command_name << Utils::RESET << std::endl;
             return std::nullopt;
         }
 
         return std::stoi(std::string{ id_str });
     }
 
-    // Command handlers
+    // =====================================
+    // Command Handler Methods
+    // =====================================
+
+    /**
+     * @brief Handle 'add' command - create new task
+     * @param parser Command line parser
+     */
     void handleAddCommand(CommandLineParser& parser) {
         parser.reset();
 
+        // Validate required task name
         if (!parser.hasMoreArgs()) {
             std::cout << Utils::RED << "Error: Task name is required" << Utils::RESET << std::endl;
             std::cout << "Usage: todo add <name> [options]" << std::endl;
@@ -206,7 +329,7 @@ private:
 
         std::string name{ parser.nextArg() };
 
-        // Parse options with simplified helper
+        // Parse optional parameters with defaults
         std::string status_str = getOptionValueWithFallback(parser, "-s", "--status");
         if (status_str.empty()) status_str = "todo";
 
@@ -216,6 +339,7 @@ private:
         std::string description = getOptionValueWithFallback(parser, "-d", "--description");
         std::string due_date_str = getOptionValueWithFallback(parser, "--due");
 
+        // Parse comma-separated tags
         std::vector<std::string> tags;
         std::string tags_str = getOptionValueWithFallback(parser, "-t", "--tags");
         if (!tags_str.empty()) {
@@ -227,9 +351,11 @@ private:
                 std::cout << Utils::CYAN << "Adding new task..." << Utils::RESET << std::endl;
             }
 
+            // Parse and validate status/priority
             TaskStatus status = Utils::parseTaskStatus(status_str);
             TaskPriority priority = Utils::parseTaskPriority(priority_str);
 
+            // Parse optional due date
             std::optional<std::chrono::system_clock::time_point> due_date;
             if (!due_date_str.empty()) {
                 due_date = Utils::parseDate(due_date_str);
@@ -238,8 +364,10 @@ private:
                 }
             }
 
+            // Execute task creation
             auto result = tasks_->addTask(name, description, status, priority, due_date, tags);
 
+            // Display result with appropriate formatting
             if (result.success) {
                 std::cout << Utils::GREEN << "✓ " << result.message << Utils::RESET << std::endl;
                 if (config_.verbose) {
@@ -257,10 +385,15 @@ private:
         }
     }
 
+    /**
+     * @brief Handle 'list' command - display tasks with optional filtering
+     * @param parser Command line parser
+     */
     void handleListCommand(CommandLineParser& parser) {
         parser.reset();
         std::string filter;
 
+        // Extract optional filter parameter
         if (parser.hasMoreArgs()) {
             auto next = parser.peekArg();
             if (!parser.isOption(next)) {
@@ -273,31 +406,33 @@ private:
                 std::cout << Utils::CYAN << "Listing tasks..." << Utils::RESET << std::endl;
             }
 
+            // Handle different filter types
             if (filter.empty()) {
                 tasks_->showAllTasks();
                 return;
             }
 
-            // Handle status filters
+            // Status-based filters
             if (filter == "todo" || filter == "inprogress" || filter == "completed") {
                 TaskStatus status = Utils::parseTaskStatus(filter);
                 tasks_->showFilteredTasks(status);
                 return;
             }
 
-            // Handle priority filters
+            // Priority-based filters
             if (filter == "low" || filter == "medium" || filter == "high") {
                 TaskPriority priority = Utils::parseTaskPriority(filter);
                 tasks_->showFilteredTasks(priority);
                 return;
             }
 
-            // Handle special filters
+            // Special filters
             if (filter == "overdue") {
                 tasks_->showOverdueTasks();
                 return;
             }
 
+            // Unknown filter
             std::cout << Utils::YELLOW << "Unknown filter: " << filter << Utils::RESET << std::endl;
             std::cout << "Available filters: todo, inprogress, completed, low, medium, high, overdue" << std::endl;
 
@@ -307,9 +442,14 @@ private:
         }
     }
 
+    /**
+     * @brief Handle 'update' command - modify existing task
+     * @param parser Command line parser
+     */
     void handleUpdateCommand(CommandLineParser& parser) {
         parser.reset();
 
+        // Parse required parameters with validation
         auto id = parseTaskId(parser, "update");
         if (!id) return;
 
@@ -336,11 +476,14 @@ private:
                 std::cout << Utils::CYAN << "Updating task " << *id << "..." << Utils::RESET << std::endl;
             }
 
+            // Parse and validate parameters
             TaskStatus status = Utils::parseTaskStatus(status_str);
             TaskPriority priority = Utils::parseTaskPriority(priority_str);
 
+            // Execute update operation
             auto result = tasks_->updateTask(*id, name, status, priority);
 
+            // Display result
             if (result.success) {
                 std::cout << Utils::GREEN << "✓ " << result.message << Utils::RESET << std::endl;
             }
@@ -353,9 +496,52 @@ private:
         }
     }
 
+    /**
+     * @brief Handle 'remove' command - delete task(s)
+     * @param parser Command line parser
+     */
     void handleRemoveCommand(CommandLineParser& parser) {
         parser.reset();
 
+        // Handle bulk removal option
+        if (parser.hasOption("--all")) {
+            try {
+                if (!config_.quiet) {
+                    std::cout << Utils::CYAN << "Preparing to remove all tasks..." << Utils::RESET << std::endl;
+                }
+
+                // Validate there are tasks to remove
+                size_t taskCount = tasks_->size();
+                if (taskCount == 0) {
+                    std::cout << Utils::YELLOW << "No tasks to remove!" << Utils::RESET << std::endl;
+                    return;
+                }
+
+                // Confirm destructive operation
+                std::cout << Utils::YELLOW << "You are about to remove " << taskCount << " task(s)!" << Utils::RESET << std::endl;
+
+                if (!Utils::confirmAction("Are you sure you want to remove ALL tasks? This action cannot be undone.")) {
+                    std::cout << Utils::CYAN << "Operation cancelled." << Utils::RESET << std::endl;
+                    return;
+                }
+
+                // Execute bulk removal
+                auto result = tasks_->removeAllTasks();
+
+                if (result.success) {
+                    std::cout << Utils::GREEN << "✓ " << result.message << Utils::RESET << std::endl;
+                }
+                else {
+                    std::cout << Utils::RED << "✗ Error: " << result.message << Utils::RESET << std::endl;
+                }
+            }
+            catch (const std::exception& e) {
+                std::cout << Utils::RED << "✗ Failed to remove all tasks: " << e.what() << Utils::RESET << std::endl;
+            }
+            return;
+        }
+
+        // Handle single task removal
         auto id = parseTaskId(parser, "remove");
         if (!id) return;
 
@@ -378,6 +564,10 @@ private:
         }
     }
 
+    /**
+     * @brief Handle 'search' command - find tasks by query
+     * @param parser Command line parser
+     */
     void handleSearchCommand(CommandLineParser& parser) {
         parser.reset();
 
@@ -394,6 +584,7 @@ private:
                 std::cout << Utils::CYAN << "Searching for: \"" << query << "\"..." << Utils::RESET << std::endl;
             }
 
+            // Execute search operation
             auto results = tasks_->searchTasks(query);
 
             if (results.empty()) {
@@ -401,6 +592,7 @@ private:
                 return;
             }
 
+            // Display search results
             tasks_->displayTaskList(results, std::format("Search results for: \"{}\"", query));
         }
         catch (const std::exception& e) {
@@ -408,6 +600,10 @@ private:
         }
     }
 
+    /**
+     * @brief Handle 'detail' command - show detailed task information
+     * @param parser Command line parser
+     */
     void handleDetailCommand(CommandLineParser& parser) {
         parser.reset();
 
@@ -432,7 +628,17 @@ private:
         }
     }
 
-    // Helper method to execute task operations
+    // =================================
+    // Generic Task Operation Helper
+    // =================================
+
+    /**
+     * @brief Execute a task operation with error handling
+     * @tparam Operation Callable type for the operation
+     * @param id Task ID to operate on
+     * @param operation_name Description of operation for user feedback
+     * @param op Operation function to execute
+     */
     template<typename Operation>
     void executeTaskOperation(int id, std::string_view operation_name, Operation&& op) {
         try {
@@ -454,6 +660,10 @@ private:
         }
     }
 
+    /**
+     * @brief Handle 'complete' command - mark task as completed
+     * @param parser Command line parser
+     */
     void handleCompleteCommand(CommandLineParser& parser) {
         parser.reset();
 
@@ -465,6 +675,10 @@ private:
             });
     }
 
+    /**
+     * @brief Handle 'tag' command - add tag to task
+     * @param parser Command line parser
+     */
     void handleTagCommand(CommandLineParser& parser) {
         parser.reset();
 
@@ -483,6 +697,10 @@ private:
             });
     }
 
+    /**
+     * @brief Handle 'untag' command - remove tag from task
+     * @param parser Command line parser
+     */
     void handleUntagCommand(CommandLineParser& parser) {
         parser.reset();
 
@@ -524,6 +742,10 @@ private:
         }
     }
 
+    /**
+     * @brief Handle 'due' command - set task due date
+     * @param parser Command line parser
+     */
     void handleDueDateCommand(CommandLineParser& parser) {
         parser.reset();
 
@@ -551,12 +773,14 @@ private:
                 std::cout << Utils::CYAN << "Setting due date for task " << id << "..." << Utils::RESET << std::endl;
             }
 
+            // Parse and validate date
             auto due_date = Utils::parseDate(date_str);
             if (!due_date) {
                 std::cout << Utils::RED << "✗ Invalid date format. Use YYYY-MM-DD" << Utils::RESET << std::endl;
                 return;
             }
 
+            // Execute due date setting
             if (auto task = tasks_->findTask(id)) {
                 task->setDueDate(due_date);
                 tasks_->save();
@@ -571,6 +795,9 @@ private:
         }
     }
 
+    /**
+     * @brief Handle 'stats' command - show task statistics
+     */
     void handleStatsCommand() {
         try {
             tasks_->showStatistics();
@@ -580,6 +807,9 @@ private:
         }
     }
 
+    /**
+     * @brief Handle 'overdue' command - show overdue tasks
+     */
     void handleOverdueCommand() {
         try {
             tasks_->showOverdueTasks();
@@ -590,14 +820,23 @@ private:
     }
 
 public:
+    /**
+     * @brief Construct TodoApplication with default configuration
+     */
     TodoApplication() {
         tasks_ = std::make_unique<Tasks>(config_.data_file);
     }
 
+    /**
+     * @brief Main application entry point
+     * @param argc Number of command-line arguments
+     * @param argv Array of command-line arguments
+     * @return Exit code (0 for success, non-zero for error)
+     */
     int run(int argc, char* argv[]) {
         CommandLineParser parser(argc, argv);
 
-        // Check for version or help
+        // Handle special options first
         if (parser.hasOption("--version")) {
             printVersion();
             return 0;
@@ -608,10 +847,10 @@ public:
             return 0;
         }
 
-        // Parse global options
+        // Parse global configuration options
         parseGlobalOptions(parser);
 
-        // Get command
+        // Extract and validate command
         auto command = parser.getCommand();
         if (command.empty()) {
             std::cout << Utils::RED << "Error: No command specified" << Utils::RESET << std::endl;
@@ -620,7 +859,7 @@ public:
         }
 
         try {
-            // Route to appropriate command handler
+            // Route command to appropriate handler
             if (command == "add") {
                 handleAddCommand(parser);
             }
@@ -672,6 +911,12 @@ public:
     }
 };
 
+/**
+ * @brief Application entry point with comprehensive error handling
+ * @param argc Number of command-line arguments
+ * @param argv Array of command-line arguments
+ * @return Exit code
+ */
 int main(int argc, char* argv[]) {
     try {
         TodoApplication app;

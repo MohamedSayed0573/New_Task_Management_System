@@ -391,4 +391,15 @@ namespace Utils {
         std::cout << std::string(width, ch) << std::endl;
     }
 
+    // Input utilities
+    bool confirmAction(std::string_view message) {
+        std::cout << YELLOW << message << " (y/N): " << RESET;
+        std::string response;
+        std::getline(std::cin, response);
+
+        // Convert to lowercase for comparison
+        std::string lower_response = toLowerCase(response);
+        return lower_response == "y" || lower_response == "yes";
+    }
+
 }

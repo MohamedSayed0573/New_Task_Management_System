@@ -1,3 +1,16 @@
+/**
+ * @file Task.cpp
+ * @brief Implementation of the Task class with modern C++ features
+ *
+ * This file implements all Task class functionality including:
+ * - Fast enum parsing using compile-time hashing
+ * - Comprehensive task property management
+ * - JSON serialization/deserialization
+ * - Date/time handling and validation
+ * - Tag management system
+ * - Display and formatting utilities
+ */
+
 #include "Task.hpp"
 #include "utils.hpp"
 #include <sstream>
@@ -7,17 +20,36 @@
 #include <stdexcept>
 #include <format>
 
-// Compile-time string hashing for fast enum lookups - Phase 1 optimization
+ // ======================================
+ // Compile-time String Hashing for Fast Enum Lookups
+ // ======================================
+
+ /**
+  * @brief Compile-time string hashing using FNV-1a algorithm
+  * @param str String view to hash
+  * @return 64-bit hash value
+  *
+  * This function enables compile-time hash computation for string literals,
+  * allowing fast enum parsing through switch statements instead of string comparisons.
+  */
 constexpr uint64_t constexpr_hash(std::string_view str) noexcept {
-    uint64_t hash = 14695981039346656037ULL;
+    uint64_t hash = 14695981039346656037ULL; // FNV offset basis
     for (char c : str) {
         hash ^= static_cast<uint64_t>(c);
-        hash *= 1099511628211ULL;
+        hash *= 1099511628211ULL; // FNV prime
     }
     return hash;
 }
 
-// Fast status parsing using compile-time hash map - Phase 1 optimization
+/**
+ * @brief Fast status parsing using compile-time hash map - Phase 1 optimization
+ * @param statusStr String representation of task status
+ * @return TaskStatus enum value
+ * @throws std::invalid_argument if status string is invalid
+ *
+ * Uses compile-time hashing to enable O(1) status parsing through switch statements.
+ * Supports multiple string formats for each status (e.g., "todo", "1", etc.)
+ */
 TaskStatus parseTaskStatusFast(std::string_view statusStr) {
     switch (constexpr_hash(statusStr)) {
     case constexpr_hash("todo"):
@@ -36,7 +68,15 @@ TaskStatus parseTaskStatusFast(std::string_view statusStr) {
     }
 }
 
-// Fast priority parsing using compile-time hash map - Phase 1 optimization
+/**
+ * @brief Fast priority parsing using compile-time hash map - Phase 1 optimization
+ * @param priorityStr String representation of task priority
+ * @return TaskPriority enum value
+ * @throws std::invalid_argument if priority string is invalid
+ *
+ * Uses compile-time hashing for efficient priority parsing.
+ * Supports multiple string formats and abbreviations.
+ */
 TaskPriority parseTaskPriorityFast(std::string_view priorityStr) {
     switch (constexpr_hash(priorityStr)) {
     case constexpr_hash("low"):
@@ -54,7 +94,16 @@ TaskPriority parseTaskPriorityFast(std::string_view priorityStr) {
     }
 }
 
-// Utility functions for enum conversions
+// =========================
+// Enum Conversion Utilities
+// =========================
+
+/**
+ * @brief Convert integer to TaskStatus enum with validation
+ * @param status Integer status value (1-3)
+ * @return TaskStatus enum value
+ * @throws std::invalid_argument if status value is out of range
+ */
 TaskStatus intToTaskStatus(int status) {
     switch (status) {
     case 1: return TaskStatus::TODO;
@@ -64,6 +113,12 @@ TaskStatus intToTaskStatus(int status) {
     }
 }
 
+/**
+ * @brief Convert integer to TaskPriority enum with validation
+ * @param priority Integer priority value (1-3)
+ * @return TaskPriority enum value
+ * @throws std::invalid_argument if priority value is out of range
+ */
 TaskPriority intToTaskPriority(int priority) {
     switch (priority) {
     case 1: return TaskPriority::LOW;
@@ -73,15 +128,36 @@ TaskPriority intToTaskPriority(int priority) {
     }
 }
 
+/**
+ * @brief Convert TaskStatus enum to integer (noexcept)
+ * @param status TaskStatus enum value
+ * @return Integer representation (1-3)
+ */
 int taskStatusToInt(TaskStatus status) noexcept {
     return static_cast<int>(status);
 }
 
+/**
+ * @brief Convert TaskPriority enum to integer (noexcept)
+ * @param priority TaskPriority enum value
+ * @return Integer representation (1-3)
+ */
 int taskPriorityToInt(TaskPriority priority) noexcept {
     return static_cast<int>(priority);
 }
 
-// Task implementation
+// ==========================================
+// Task Class Implementation
+// ==========================================
+
+/**
+ * @brief Construct Task with validation and automatic timestamp
+ * @param id Unique task identifier
+ * @param name Task name (validated non-empty)
+ * @param status Initial task status
+ * @param priority Initial task priority
+ * @throws std::invalid_argument if name is empty
+ */
 Task::Task(int id, std::string_view name, TaskStatus status, TaskPriority priority)
     : id(id), name(name), status(status), priority(priority),
     created_at(std::chrono::system_clock::now()) {
@@ -90,7 +166,10 @@ Task::Task(int id, std::string_view name, TaskStatus status, TaskPriority priori
     }
 }
 
-// Getters
+// =================
+// Property Getters (all noexcept for performance)
+// =================
+
 int Task::getId() const noexcept {
     return id;
 }
@@ -127,7 +206,15 @@ const std::vector<std::string>& Task::getTags() const noexcept {
     return tags;
 }
 
-// Setters with validation
+// =========================
+// Property Setters with Validation and Side Effects
+// =========================
+
+/**
+ * @brief Set task name with validation
+ * @param name New task name
+ * @throws std::invalid_argument if name is empty
+ */
 void Task::setName(std::string_view name) {
     if (name.empty()) {
         throw std::invalid_argument("Task name cannot be empty");
@@ -135,15 +222,23 @@ void Task::setName(std::string_view name) {
     this->name = name;
 }
 
+/**
+ * @brief Set task status with automatic completion timestamp management
+ * @param status New task status
+ *
+ * Automatically sets completion timestamp when status changes to COMPLETED
+ * and clears it when status changes away from COMPLETED.
+ */
 void Task::setStatus(TaskStatus status) {
     TaskStatus old_status = this->status;
     this->status = status;
 
+    // Auto-manage completion timestamp based on status changes
     if (status == TaskStatus::COMPLETED && old_status != TaskStatus::COMPLETED) {
         completed_at = std::chrono::system_clock::now();
     }
     else if (status != TaskStatus::COMPLETED) {
-        completed_at.reset();
+        completed_at.reset(); // Clear completion time if moving away from completed
     }
 }
 
@@ -159,7 +254,17 @@ void Task::setDueDate(const std::optional<std::chrono::system_clock::time_point>
     this->due_date = due_date;
 }
 
-// Tag management
+// ================
+// Tag Management System
+// ================
+
+/**
+ * @brief Add tag to task (prevents duplicates)
+ * @param tag Tag string to add
+ *
+ * Only adds the tag if it's non-empty and not already present.
+ * Prevents duplicate tags in the collection.
+ */
 void Task::addTag(std::string_view tag) {
     std::string tag_str{ tag };
     if (!tag_str.empty() && !hasTag(tag)) {
@@ -167,6 +272,12 @@ void Task::addTag(std::string_view tag) {
     }
 }
 
+/**
+ * @brief Remove tag from task
+ * @param tag Tag string to remove
+ *
+ * Uses std::ranges::find for efficient tag lookup and removal.
+ */
 void Task::removeTag(std::string_view tag) {
     auto it = std::ranges::find(tags, tag);
     if (it != tags.end()) {
@@ -174,11 +285,23 @@ void Task::removeTag(std::string_view tag) {
     }
 }
 
+/**
+ * @brief Check if task has specific tag
+ * @param tag Tag string to search for
+ * @return true if tag exists, false otherwise
+ */
 bool Task::hasTag(std::string_view tag) const {
     return std::ranges::find(tags, tag) != tags.end();
 }
 
-// Status and utility methods
+// ===================
+// Status and Utility Methods
+// ===================
+
+/**
+ * @brief Get human-readable status string
+ * @return Formatted status string
+ */
 std::string Task::getStatusString() const {
     switch (status) {
     case TaskStatus::TODO: return "To-Do";
@@ -188,6 +311,10 @@ std::string Task::getStatusString() const {
     }
 }
 
+/**
+ * @brief Get human-readable priority string
+ * @return Formatted priority string
+ */
 std::string Task::getPriorityString() const {
     switch (priority) {
     case TaskPriority::LOW: return "Low";
@@ -197,10 +324,18 @@ std::string Task::getPriorityString() const {
     }
 }
 
+/**
+ * @brief Get formatted creation date/time
+ * @return Human-readable creation timestamp
+ */
 std::string Task::getFormattedCreatedAt() const {
     return Utils::formatDateTime(created_at);
 }
 
+/**
+ * @brief Get formatted due date or default message
+ * @return Formatted due date or "No due date"
+ */
 std::string Task::getFormattedDueDate() const {
     if (due_date) {
         return Utils::formatDate(*due_date);
@@ -208,38 +343,79 @@ std::string Task::getFormattedDueDate() const {
     return "No due date";
 }
 
+/**
+ * @brief Check if task is overdue
+ * @return true if task has due date in the past and is not completed
+ *
+ * A task is considered overdue if:
+ * 1. It has a due date set
+ * 2. Current time is past the due date
+ * 3. Task is not completed
+ */
 bool Task::isOverdue() const {
     if (!due_date) return false;
     return std::chrono::system_clock::now() > *due_date && status != TaskStatus::COMPLETED;
 }
 
+/**
+ * @brief Calculate days until due date
+ * @return Number of days (can be negative if overdue)
+ *
+ * Returns 0 if no due date is set.
+ * Negative values indicate overdue tasks.
+ */
 std::chrono::days Task::getDaysUntilDue() const {
     if (!due_date) return std::chrono::days{ 0 };
     auto now = std::chrono::system_clock::now();
     return std::chrono::duration_cast<std::chrono::days>(*due_date - now);
 }
 
+/**
+ * @brief Mark task as completed (convenience method)
+ *
+ * Sets status to COMPLETED which automatically updates completion timestamp.
+ */
 void Task::markCompleted() {
     setStatus(TaskStatus::COMPLETED);
 }
 
+/**
+ * @brief Check if task matches search query
+ * @param query Search query string
+ * @return true if task matches query in name, description, or tags
+ *
+ * Performs case-insensitive search across:
+ * - Task name
+ * - Task description
+ * - All tags
+ */
 bool Task::matches(std::string_view query) const {
     std::string query_lower = Utils::toLowerCase(query);
     std::string name_lower = Utils::toLowerCase(name);
     std::string desc_lower = Utils::toLowerCase(description);
 
-    // Check name and description
+    // Check name and description for matches
     if (Utils::contains(name_lower, query_lower) || Utils::contains(desc_lower, query_lower)) {
         return true;
     }
 
-    // Check tags
+    // Check all tags for matches
     return std::ranges::any_of(tags, [&](const std::string& tag) {
         return Utils::contains(Utils::toLowerCase(tag), query_lower);
         });
 }
 
-// JSON serialization
+// ============================
+// JSON Serialization Support
+// ============================
+
+/**
+ * @brief Convert task to JSON for persistence
+ * @return JSON object representing the task
+ *
+ * Serializes all task properties including optional fields.
+ * Uses Unix timestamp format for time points.
+ */
 nlohmann::json Task::toJson() const {
     nlohmann::json j{
         {"id", id},
@@ -251,10 +427,12 @@ nlohmann::json Task::toJson() const {
         {"tags", tags}
     };
 
+    // Add optional completion timestamp
     if (completed_at) {
         j["completed_at"] = std::chrono::duration_cast<std::chrono::seconds>(completed_at->time_since_epoch()).count();
     }
 
+    // Add optional due date
     if (due_date) {
         j["due_date"] = std::chrono::duration_cast<std::chrono::seconds>(due_date->time_since_epoch()).count();
     }
@@ -262,7 +440,17 @@ nlohmann::json Task::toJson() const {
     return j;
 }
 
+/**
+ * @brief Create task from JSON data
+ * @param j JSON object containing task data
+ * @return Task object reconstructed from JSON
+ * @throws Various exceptions if JSON is malformed
+ *
+ * Deserializes task from JSON format with proper error handling.
+ * Handles optional fields gracefully.
+ */
 Task Task::fromJson(const nlohmann::json& j) {
+    // Create basic task from required fields
     Task task(
         j.at("id").get<int>(),
         j.at("name").get<std::string>(),
@@ -270,25 +458,25 @@ Task Task::fromJson(const nlohmann::json& j) {
         intToTaskPriority(j.at("priority").get<int>())
     );
 
-    // Set creation time
+    // Restore creation timestamp
     if (j.contains("created_at")) {
         auto seconds = std::chrono::seconds{ j.at("created_at").get<int64_t>() };
         task.created_at = std::chrono::system_clock::time_point{ seconds };
     }
 
-    // Set completion time
+    // Restore optional completion timestamp
     if (j.contains("completed_at")) {
         auto seconds = std::chrono::seconds{ j.at("completed_at").get<int64_t>() };
         task.completed_at = std::chrono::system_clock::time_point{ seconds };
     }
 
-    // Set due date
+    // Restore optional due date
     if (j.contains("due_date")) {
         auto seconds = std::chrono::seconds{ j.at("due_date").get<int64_t>() };
         task.due_date = std::chrono::system_clock::time_point{ seconds };
     }
 
-    // Set description and tags
+    // Restore optional description and tags
     if (j.contains("description")) {
         task.description = j.at("description").get<std::string>();
     }
@@ -300,17 +488,28 @@ Task Task::fromJson(const nlohmann::json& j) {
     return task;
 }
 
-// Display methods
+// =================
+// Display Methods
+// =================
+
+/**
+ * @brief Get compact string representation for table display
+ * @return Formatted string with essential task info
+ *
+ * Provides a single-line representation suitable for table rows.
+ * Includes color coding and overdue indicators.
+ */
 std::string Task::toString() const {
     std::ostringstream oss;
 
-    // Color coding based on status and priority
+    // Get appropriate colors for visual feedback
     auto statusColor = Utils::getStatusColor(status);
     auto priorityColor = Utils::getPriorityColor(priority);
 
-    // Add overdue indicator
+    // Add overdue warning indicator
     std::string overdueIndicator = isOverdue() ? " ⚠️" : "";
 
+    // Format with consistent column widths
     oss << std::left << std::setw(4) << id
         << std::setw(30) << (name + overdueIndicator)
         << statusColor << std::setw(12) << getStatusString() << Utils::RESET
@@ -324,6 +523,13 @@ std::string Task::toString() const {
     return oss.str();
 }
 
+/**
+ * @brief Get detailed string representation for full task view
+ * @return Multi-line formatted string with all task details
+ *
+ * Provides comprehensive task information including all metadata.
+ * Used for detailed task display commands.
+ */
 std::string Task::toDetailedString() const {
     std::ostringstream oss;
 
@@ -339,7 +545,7 @@ std::string Task::toDetailedString() const {
     if (due_date) {
         oss << "Due Date: " << getFormattedDueDate();
         if (isOverdue()) {
-            oss << Utils::RED << " (OVERDUE)" << Utils::RESET;
+            oss << " " << Utils::RED << "(OVERDUE)" << Utils::RESET;
         }
         oss << "\n";
     }
@@ -351,7 +557,7 @@ std::string Task::toDetailedString() const {
     if (!tags.empty()) {
         oss << "Tags: ";
         for (size_t i = 0; i < tags.size(); ++i) {
-            oss << Utils::CYAN << "#" << tags[i] << Utils::RESET;
+            oss << Utils::BLUE << "#" << tags[i] << Utils::RESET;
             if (i < tags.size() - 1) oss << ", ";
         }
         oss << "\n";
@@ -360,22 +566,42 @@ std::string Task::toDetailedString() const {
     return oss.str();
 }
 
-// Operators
+// ==================
+// Comparison Operators
+// ==================
+
+/**
+ * @brief Equality comparison based on task ID
+ * @param other Task to compare with
+ * @return true if tasks have same ID
+ */
 bool Task::operator==(const Task& other) const noexcept {
     return id == other.id;
 }
 
+/**
+ * @brief Less-than comparison for sorting
+ * @param other Task to compare with
+ * @return true if this task should come before other in sorted order
+ *
+ * Sorting priority:
+ * 1. Priority (high first)
+ * 2. Due date (earlier first, no due date last)
+ * 3. Creation date (earlier first)
+ */
 bool Task::operator<(const Task& other) const noexcept {
-    // Sort by priority (high first), then by due date, then by creation date
+    // Sort by priority (high first)
     if (priority != other.priority) {
-        return priority > other.priority;  // High priority first
+        return priority > other.priority; // Higher priority comes first
     }
 
+    // Then by due date (earlier due dates first, no due date last)
     if (due_date != other.due_date) {
-        if (!due_date) return false;  // Tasks without due date go last
-        if (!other.due_date) return true;
-        return *due_date < *other.due_date;  // Earlier due dates first
+        if (!due_date) return false;     // No due date goes last
+        if (!other.due_date) return true; // Has due date goes first
+        return due_date < other.due_date;  // Earlier due date first
     }
 
-    return created_at < other.created_at;  // Earlier creation dates first
+    // Finally by creation date (earlier first)
+    return created_at < other.created_at;
 }

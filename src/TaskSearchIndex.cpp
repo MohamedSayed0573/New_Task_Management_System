@@ -1,5 +1,4 @@
 #include "TaskSearchIndex.hpp"
-#include "benchmark.hpp"
 #include "utils.hpp"
 #include <algorithm>
 #include <cctype>
@@ -120,8 +119,6 @@ void TaskSearchIndex::removeStringFromIndex(std::string_view str, const Task& ta
 
 std::vector<std::reference_wrapper<const Task>>
 TaskSearchIndex::searchPrefix(std::string_view prefix) const {
-    BENCHMARK("Trie Prefix Search"); // Phase 2 optimization: Add benchmarking
-
     if (prefix.empty()) {
         return {};
     }
@@ -138,8 +135,6 @@ TaskSearchIndex::searchPrefix(std::string_view prefix) const {
 
 std::vector<std::reference_wrapper<const Task>>
 TaskSearchIndex::searchSubstring(std::string_view substring) const {
-    BENCHMARK("Trie Substring Search"); // Phase 2 optimization: Add benchmarking
-
     if (substring.empty()) {
         return {};
     }

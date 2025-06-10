@@ -1,96 +1,158 @@
-# Makefile for To-Do List Manager - Enhanced with Phase 1 optimizations
-CXX = g++
-CXXFLAGS_BASE = -std=c++23 -Wall -Wextra -Iinclude
-CXXFLAGS_DEBUG = $(CXXFLAGS_BASE) -g -O0 -DDEBUG -fsanitize=address,undefined
-CXXFLAGS_RELEASE = $(CXXFLAGS_BASE) -O3 -DNDEBUG -march=native -flto -ffast-math
-CXXFLAGS_PROFILE = $(CXXFLAGS_RELEASE) -pg -fno-omit-frame-pointer
+# ================================================================
+# Modern Makefile for Todo List Manager
+# ================================================================
 
-# Link Time Optimization for release builds
-LDFLAGS_RELEASE = -flto -Wl,--gc-sections -s
-LDFLAGS_DEBUG = -fsanitize=address,undefined
-LDFLAGS_PROFILE = $(LDFLAGS_RELEASE) -pg
+# ===================
+# Compiler Settings
+# ===================
+CXX      = g++
+CXXFLAGS = -std=c++20 -Wall -Wextra -Wpedantic -Iinclude
+LDFLAGS  = 
 
-# Select build type (default: release)
+# ===================
+# Build Configuration
+# ===================
 BUILD_TYPE ?= release
+
 ifeq ($(BUILD_TYPE),debug)
-    CXXFLAGS = $(CXXFLAGS_DEBUG)
-    LDFLAGS = $(LDFLAGS_DEBUG)
+    CXXFLAGS += -g -O0 -DDEBUG -fsanitize=address,undefined
+    LDFLAGS  += -fsanitize=address,undefined
+    $(info Building in DEBUG mode)
 else ifeq ($(BUILD_TYPE),profile)
-    CXXFLAGS = $(CXXFLAGS_PROFILE)
-    LDFLAGS = $(LDFLAGS_PROFILE)
+    CXXFLAGS += -O2 -pg -fno-omit-frame-pointer
+    LDFLAGS  += -pg
+    $(info Building in PROFILE mode)
 else
-    CXXFLAGS = $(CXXFLAGS_RELEASE)
-    LDFLAGS = $(LDFLAGS_RELEASE)
+    CXXFLAGS += -O3 -DNDEBUG -march=native
+    LDFLAGS  += -s
+    $(info Building in RELEASE mode)
 endif
 
-# Parallel compilation
-MAKEFLAGS += -j$(shell nproc)
-
+# ===================
 # Directories
+# ===================
 SRCDIR = src
-INCDIR = include
 OBJDIR = obj
-DATADIR = data
+INCDIR = include
 
-# Source files
+# ===================
+# Files
+# ===================
 SOURCES = $(wildcard $(SRCDIR)/*.cpp)
 OBJECTS = $(SOURCES:$(SRCDIR)/%.cpp=$(OBJDIR)/%.o)
+TARGET  = todo
 
-# Target executable
-TARGET = todo
+# ===================
+# Dependencies
+# ===================
+DEPS = $(OBJECTS:.o=.d)
+
+# ===================
+# Build Rules
+# ===================
 
 # Default target
 all: $(TARGET)
 
-# Create directories if they don't exist
+# Create object directory
 $(OBJDIR):
-	mkdir -p $(OBJDIR)
+	@mkdir -p $(OBJDIR)
 
-$(DATADIR):
-	mkdir -p $(DATADIR)
+# Link executable
+$(TARGET): $(OBJECTS)
+	@echo "Linking $@..."
+	@$(CXX) $(OBJECTS) -o $@ $(LDFLAGS)
+	@echo "Build complete: $@"
 
-# Build target
-$(TARGET): $(OBJDIR) $(DATADIR) $(OBJECTS)
-	$(CXX) $(OBJECTS) -o $(TARGET) $(LDFLAGS)
+# Compile source files with dependency generation
+$(OBJDIR)/%.o: $(SRCDIR)/%.cpp | $(OBJDIR)
+	@echo "Compiling $<..."
+	@$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $@
 
-# Compile source files
-$(OBJDIR)/%.o: $(SRCDIR)/%.cpp
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+# Include dependency files
+-include $(DEPS)
 
-# Clean build files
+# ===================
+# Utility Targets
+# ===================
+
+# Clean build artifacts
 clean:
-	rm -rf $(OBJDIR) $(TARGET)
+	@echo "Cleaning build files..."
+	@rm -rf $(OBJDIR) $(TARGET)
 
-# Clean everything including data
-clean-all: clean
-	rm -rf $(DATADIR)
+# Clean everything
+distclean: clean
+	@echo "Cleaning all generated files..."
+	@rm -rf data/*.json
 
-# Install (copy to /usr/local/bin)
-install: $(TARGET)
-	sudo cp $(TARGET) /usr/local/bin/
-
-# Uninstall
-uninstall:
-	sudo rm -f /usr/local/bin/$(TARGET)
-
-# Run the application
+# Build and run
 run: $(TARGET)
-	./$(TARGET)
+	@echo "Running $(TARGET)..."
+	@./$(TARGET)
 
-# Debug build
-debug: CXXFLAGS += -g -DDEBUG
-debug: clean $(TARGET)
+# Debug build shortcut
+debug:
+	@$(MAKE) BUILD_TYPE=debug
 
-# Help
+# Profile build shortcut
+profile:
+	@$(MAKE) BUILD_TYPE=profile
+
+# Deploy target: clean, debug build, and install
+deploy:
+	@echo "Starting deployment process..."
+	@$(MAKE) clean
+	@$(MAKE) BUILD_TYPE=debug
+	@$(MAKE) install
+	@echo "Deployment complete!"
+
+# Install to system
+install: $(TARGET)
+	@echo "Installing $(TARGET) to /usr/local/bin..."
+	@sudo cp $(TARGET) /usr/local/bin/
+	@echo "Installation complete!"
+
+# Uninstall from system
+uninstall:
+	@echo "Removing $(TARGET) from /usr/local/bin..."
+	@sudo rm -f /usr/local/bin/$(TARGET)
+	@echo "Uninstall complete!"
+
+# Show help
 help:
-	@echo "Available targets:"
+	@echo "Todo List Manager - Build System"
+	@echo "================================="
+	@echo ""
+	@echo "Targets:"
 	@echo "  all       - Build the application (default)"
-	@echo "  clean     - Remove build files"
-	@echo "  clean-all - Remove build files and data"
-	@echo "  install   - Install to /usr/local/bin"
-	@echo "  uninstall - Remove from /usr/local/bin"
+	@echo "  clean     - Remove build artifacts"
+	@echo "  distclean - Remove all generated files"
 	@echo "  run       - Build and run the application"
-	@echo "  debug     - Build with debug information"
+	@echo "  deploy    - Clean, debug build, and install"
+	@echo "  install   - Install to system (requires sudo)"
+	@echo "  uninstall - Remove from system (requires sudo)"
 	@echo "  help      - Show this help message"
+	@echo ""
+	@echo "Build Types:"
+	@echo "  make BUILD_TYPE=release  - Optimized build (default)"
+	@echo "  make BUILD_TYPE=debug    - Debug build with sanitizers"
+	@echo "  make BUILD_TYPE=profile  - Profiling build"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make                     - Release build"
+	@echo "  make debug               - Debug build"
+	@echo "  make run                 - Build and run"
+	@echo "  make clean all           - Clean and rebuild"
+	@echo "  make deploy              - Clean, debug build, and install"
 
-.PHONY: all clean clean-all install uninstall run debug help
+# ===================
+# Phony Targets
+# ===================
+.PHONY: all clean distclean run debug profile deploy install uninstall help
+
+# ===================
+# Special Targets
+# ===================
+.DEFAULT_GOAL := all
+.SUFFIXES:

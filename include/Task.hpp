@@ -1,3 +1,12 @@
+/**
+ * @file Task.hpp
+ * @brief Task class definition with modern C++ features
+ *
+ * This header defines the core Task class and related enums for the todo application.
+ * Includes comprehensive task management functionality with validation, JSON serialization,
+ * and modern C++20/23 features.
+ */
+
 #ifndef TASK_HPP
 #define TASK_HPP
 
@@ -8,98 +17,160 @@
 #include <vector>
 #include "json.hpp"
 
+ /**
+  * @enum TaskStatus
+  * @brief Represents the current state of a task
+  */
 enum class TaskStatus : int {
-    TODO = 1,
-    IN_PROGRESS = 2,
-    COMPLETED = 3
+    TODO = 1,        ///< Task is pending and not started
+    IN_PROGRESS = 2, ///< Task is currently being worked on
+    COMPLETED = 3    ///< Task has been finished
 };
 
+/**
+ * @enum TaskPriority
+ * @brief Represents the importance level of a task
+ */
 enum class TaskPriority : int {
-    LOW = 1,
-    MEDIUM = 2,
-    HIGH = 3
+    LOW = 1,    ///< Low importance task
+    MEDIUM = 2, ///< Medium importance task  
+    HIGH = 3    ///< High importance task - urgent
 };
 
+/**
+ * @class Task
+ * @brief Core task entity with comprehensive functionality
+ *
+ * Represents a single task with all associated metadata including:
+ * - Basic info (ID, name, description)
+ * - Status and priority management
+ * - Date tracking (created, completed, due dates)
+ * - Tag system for categorization
+ * - JSON serialization for persistence
+ */
 class Task {
 private:
-    int id;
-    std::string name;
-    TaskStatus status;
-    TaskPriority priority;
-    std::chrono::system_clock::time_point created_at;
-    std::optional<std::chrono::system_clock::time_point> completed_at;
-    std::optional<std::chrono::system_clock::time_point> due_date;
-    std::string description;
-    std::vector<std::string> tags;
+    // Core task properties
+    int id;                          ///< Unique identifier for the task
+    std::string name;                ///< Task name/title
+    TaskStatus status;               ///< Current status of the task
+    TaskPriority priority;           ///< Priority level of the task
+
+    // Timestamp management
+    std::chrono::system_clock::time_point created_at;                           ///< When the task was created
+    std::optional<std::chrono::system_clock::time_point> completed_at;          ///< When the task was completed (if applicable)
+    std::optional<std::chrono::system_clock::time_point> due_date;              ///< When the task is due (optional)
+
+    // Additional metadata
+    std::string description;         ///< Detailed description of the task
+    std::vector<std::string> tags;   ///< List of tags for categorization
 
 public:
-    // Constructor with modern initialization
+    // ===========================
+    // Constructors and Destructors
+    // ===========================
+
+    /**
+     * @brief Construct a new Task with validation
+     * @param id Unique task identifier
+     * @param name Task name (must not be empty)
+     * @param status Initial status (default: TODO)
+     * @param priority Initial priority (default: LOW)
+     * @throws std::invalid_argument if name is empty
+     */
     Task(int id, std::string_view name, TaskStatus status = TaskStatus::TODO,
         TaskPriority priority = TaskPriority::LOW);
 
-    // Rule of 5 (modern C++)
-    Task(const Task&) = default;
-    Task(Task&&) = default;
-    Task& operator=(const Task&) = default;
-    Task& operator=(Task&&) = default;
-    ~Task() = default;
+    // Rule of 5 for modern C++ - explicit defaults for compiler-generated functions
+    Task(const Task&) = default;               ///< Copy constructor
+    Task(Task&&) = default;                    ///< Move constructor  
+    Task& operator=(const Task&) = default;    ///< Copy assignment
+    Task& operator=(Task&&) = default;         ///< Move assignment
+    ~Task() = default;                         ///< Destructor
 
-    // Getters
-    [[nodiscard]] int getId() const noexcept;
-    [[nodiscard]] const std::string& getName() const noexcept;
-    [[nodiscard]] TaskStatus getStatus() const noexcept;
-    [[nodiscard]] TaskPriority getPriority() const noexcept;
-    [[nodiscard]] const std::chrono::system_clock::time_point& getCreatedAt() const noexcept;
-    [[nodiscard]] const std::optional<std::chrono::system_clock::time_point>& getCompletedAt() const noexcept;
-    [[nodiscard]] const std::optional<std::chrono::system_clock::time_point>& getDueDate() const noexcept;
-    [[nodiscard]] const std::string& getDescription() const noexcept;
-    [[nodiscard]] const std::vector<std::string>& getTags() const noexcept;
+    // =================
+    // Property Getters
+    // =================
 
-    // Setters with validation
-    void setName(std::string_view name);
-    void setStatus(TaskStatus status);
-    void setPriority(TaskPriority priority);
-    void setDescription(std::string_view description);
-    void setDueDate(const std::optional<std::chrono::system_clock::time_point>& due_date);
+    [[nodiscard]] int getId() const noexcept;                                                                  ///< Get task ID
+    [[nodiscard]] const std::string& getName() const noexcept;                                                ///< Get task name
+    [[nodiscard]] TaskStatus getStatus() const noexcept;                                                      ///< Get task status
+    [[nodiscard]] TaskPriority getPriority() const noexcept;                                                  ///< Get task priority
+    [[nodiscard]] const std::chrono::system_clock::time_point& getCreatedAt() const noexcept;                ///< Get creation timestamp
+    [[nodiscard]] const std::optional<std::chrono::system_clock::time_point>& getCompletedAt() const noexcept; ///< Get completion timestamp
+    [[nodiscard]] const std::optional<std::chrono::system_clock::time_point>& getDueDate() const noexcept;    ///< Get due date
+    [[nodiscard]] const std::string& getDescription() const noexcept;                                         ///< Get task description
+    [[nodiscard]] const std::vector<std::string>& getTags() const noexcept;                                   ///< Get list of tags
 
-    // Tag management
-    void addTag(std::string_view tag);
-    void removeTag(std::string_view tag);
-    [[nodiscard]] bool hasTag(std::string_view tag) const;
+    // =========================
+    // Property Setters with Validation
+    // =========================
 
-    // Status helper methods
-    [[nodiscard]] std::string getStatusString() const;
-    [[nodiscard]] std::string getPriorityString() const;
-    [[nodiscard]] std::string getFormattedCreatedAt() const;
-    [[nodiscard]] std::string getFormattedDueDate() const;
-    [[nodiscard]] bool isOverdue() const;
-    [[nodiscard]] std::chrono::days getDaysUntilDue() const;
+    void setName(std::string_view name);                                                           ///< Set task name (validates non-empty)
+    void setStatus(TaskStatus status);                                                             ///< Set status (auto-updates completion time)
+    void setPriority(TaskPriority priority);                                                       ///< Set priority level
+    void setDescription(std::string_view description);                                             ///< Set task description
+    void setDueDate(const std::optional<std::chrono::system_clock::time_point>& due_date);        ///< Set due date (optional)
 
-    // Utility methods
-    void markCompleted();
-    [[nodiscard]] bool matches(std::string_view query) const;
+    // ================
+    // Tag Management
+    // ================
 
-    // JSON serialization
-    [[nodiscard]] nlohmann::json toJson() const;
-    static Task fromJson(const nlohmann::json& j);
+    void addTag(std::string_view tag);           ///< Add a tag to the task (prevents duplicates)
+    void removeTag(std::string_view tag);        ///< Remove a tag from the task
+    [[nodiscard]] bool hasTag(std::string_view tag) const; ///< Check if task has a specific tag
 
-    // Display
-    [[nodiscard]] std::string toString() const;
-    [[nodiscard]] std::string toDetailedString() const;
+    // ===================
+    // Status and Utilities
+    // ===================
 
-    // Operators
-    bool operator==(const Task& other) const noexcept;
-    bool operator<(const Task& other) const noexcept;  // For sorting by priority then due date
+    [[nodiscard]] std::string getStatusString() const;      ///< Get human-readable status
+    [[nodiscard]] std::string getPriorityString() const;    ///< Get human-readable priority
+    [[nodiscard]] std::string getFormattedCreatedAt() const; ///< Get formatted creation date
+    [[nodiscard]] std::string getFormattedDueDate() const;  ///< Get formatted due date
+    [[nodiscard]] bool isOverdue() const;                   ///< Check if task is past due date
+    [[nodiscard]] std::chrono::days getDaysUntilDue() const; ///< Get days until due (can be negative)
+
+    // ==================
+    // Convenience Methods
+    // ==================
+
+    void markCompleted();                                    ///< Mark task as completed (sets status and completion time)
+    [[nodiscard]] bool matches(std::string_view query) const; ///< Check if task matches search query
+
+    // ====================
+    // Serialization Support
+    // ====================
+
+    [[nodiscard]] nlohmann::json toJson() const;            ///< Convert task to JSON for persistence
+    static Task fromJson(const nlohmann::json& j);          ///< Create task from JSON data
+
+    // =================
+    // Display Methods
+    // =================
+
+    [[nodiscard]] std::string toString() const;             ///< Get compact string representation
+    [[nodiscard]] std::string toDetailedString() const;     ///< Get detailed string representation
+
+    // ==================
+    // Comparison Operators
+    // ==================
+
+    bool operator==(const Task& other) const noexcept;      ///< Equality comparison (by ID)
+    bool operator<(const Task& other) const noexcept;       ///< Less-than comparison (for sorting by priority/due date)
 };
 
-// Utility functions for enum conversions
-[[nodiscard]] TaskStatus intToTaskStatus(int status);
-[[nodiscard]] TaskPriority intToTaskPriority(int priority);
-[[nodiscard]] int taskStatusToInt(TaskStatus status) noexcept;
-[[nodiscard]] int taskPriorityToInt(TaskPriority priority) noexcept;
+// ===============================
+// Utility Functions for Enum Conversion
+// ===============================
+
+[[nodiscard]] TaskStatus intToTaskStatus(int status);       ///< Convert integer to TaskStatus enum
+[[nodiscard]] TaskPriority intToTaskPriority(int priority); ///< Convert integer to TaskPriority enum
+[[nodiscard]] int taskStatusToInt(TaskStatus status) noexcept;    ///< Convert TaskStatus to integer
+[[nodiscard]] int taskPriorityToInt(TaskPriority priority) noexcept; ///< Convert TaskPriority to integer
 
 // Fast parsing functions using constexpr hashing - Phase 1 optimization
-[[nodiscard]] TaskStatus parseTaskStatusFast(std::string_view statusStr);
-[[nodiscard]] TaskPriority parseTaskPriorityFast(std::string_view priorityStr);
+[[nodiscard]] TaskStatus parseTaskStatusFast(std::string_view statusStr);     ///< Fast status parsing using compile-time hashing
+[[nodiscard]] TaskPriority parseTaskPriorityFast(std::string_view priorityStr); ///< Fast priority parsing using compile-time hashing
 
 #endif // TASK_HPP
