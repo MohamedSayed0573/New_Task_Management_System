@@ -19,19 +19,25 @@ namespace TaskFilters {
         { container.size() } -> std::convertible_to<size_t>;
     };
 
+    // Helper function to get task reference from container element
+    template<typename T>
+    const Task& getTaskRef(const T& task_ptr) {
+        if constexpr (std::is_pointer_v<std::decay_t<T>>) {
+            return *task_ptr;
+        }
+        else {
+            return *task_ptr;  // unique_ptr case
+        }
+    }
+
     // High-priority incomplete tasks using ranges and views
     template<TaskContainer Container>
     auto getHighPriorityIncompleteTasks(const Container& tasks) {
         return tasks
             | std::views::filter([](const auto& task_ptr) {
-            const Task& task = (std::is_pointer_v<std::decay_t<decltype(*task_ptr)>>)
-                ? **task_ptr : *task_ptr;
-            return task.getPriority() == TaskPriority::HIGH;
-                })
-            | std::views::filter([](const auto& task_ptr) {
-            const Task& task = (std::is_pointer_v<std::decay_t<decltype(*task_ptr)>>)
-                ? **task_ptr : *task_ptr;
-            return task.getStatus() != TaskStatus::COMPLETED;
+            const Task& task = getTaskRef(task_ptr);
+            return task.getPriority() == TaskPriority::HIGH &&
+                task.getStatus() != TaskStatus::COMPLETED;
                 });
     }
 
@@ -40,8 +46,7 @@ namespace TaskFilters {
     auto getCriticalOverdueTasks(const Container& tasks) {
         return tasks
             | std::views::filter([](const auto& task_ptr) {
-            const Task& task = (std::is_pointer_v<std::decay_t<decltype(*task_ptr)>>)
-                ? **task_ptr : *task_ptr;
+            const Task& task = getTaskRef(task_ptr);
             return task.isOverdue() && task.getPriority() == TaskPriority::HIGH;
                 });
     }
@@ -52,15 +57,10 @@ namespace TaskFilters {
         TaskStatus status,
         TaskPriority min_priority) {
         return tasks
-            | std::views::filter([status](const auto& task_ptr) {
-            const Task& task = (std::is_pointer_v<std::decay_t<decltype(*task_ptr)>>)
-                ? **task_ptr : *task_ptr;
-            return task.getStatus() == status;
-                })
-            | std::views::filter([min_priority](const auto& task_ptr) {
-            const Task& task = (std::is_pointer_v<std::decay_t<decltype(*task_ptr)>>)
-                ? **task_ptr : *task_ptr;
-            return static_cast<int>(task.getPriority()) >= static_cast<int>(min_priority);
+            | std::views::filter([status, min_priority](const auto& task_ptr) {
+            const Task& task = getTaskRef(task_ptr);
+            return task.getStatus() == status &&
+                static_cast<int>(task.getPriority()) >= static_cast<int>(min_priority);
                 });
     }
 
@@ -70,8 +70,7 @@ namespace TaskFilters {
         if (std::ranges::empty(tasks)) return 0.0;
 
         auto completed_count = std::ranges::count_if(tasks, [](const auto& task_ptr) {
-            const Task& task = (std::is_pointer_v<std::decay_t<decltype(*task_ptr)>>)
-                ? **task_ptr : *task_ptr;
+            const Task& task = getTaskRef(task_ptr);
             return task.getStatus() == TaskStatus::COMPLETED;
             });
 
@@ -97,20 +96,17 @@ namespace TaskFilters {
             }
 
             metrics.completed_tasks = std::ranges::count_if(tasks, [](const auto& task_ptr) {
-                const Task& task = (std::is_pointer_v<std::decay_t<decltype(*task_ptr)>>)
-                    ? **task_ptr : *task_ptr;
+                const Task& task = getTaskRef(task_ptr);
                 return task.getStatus() == TaskStatus::COMPLETED;
                 });
 
             metrics.high_priority_tasks = std::ranges::count_if(tasks, [](const auto& task_ptr) {
-                const Task& task = (std::is_pointer_v<std::decay_t<decltype(*task_ptr)>>)
-                    ? **task_ptr : *task_ptr;
+                const Task& task = getTaskRef(task_ptr);
                 return task.getPriority() == TaskPriority::HIGH;
                 });
 
             metrics.overdue_tasks = std::ranges::count_if(tasks, [](const auto& task_ptr) {
-                const Task& task = (std::is_pointer_v<std::decay_t<decltype(*task_ptr)>>)
-                    ? **task_ptr : *task_ptr;
+                const Task& task = getTaskRef(task_ptr);
                 return task.isOverdue();
                 });
 

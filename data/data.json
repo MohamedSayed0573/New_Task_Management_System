@@ -1,5 +1,5 @@
 {
-    "nextId": 30,
+    "nextId": 34,
     "tasks": [
         {
             "created_at": 1749378803,
@@ -264,6 +264,47 @@
             "id": 29,
             "name": "Test overdue task",
             "priority": 1,
+            "status": 1,
+            "tags": []
+        },
+        {
+            "created_at": 1749565429,
+            "description": "",
+            "id": 30,
+            "name": "Test task",
+            "priority": 3,
+            "status": 1,
+            "tags": []
+        },
+        {
+            "created_at": 1749567422,
+            "description": "Successfully removed CLI11 dependency",
+            "due_date": 1749938400,
+            "id": 31,
+            "name": "CLI11-free task",
+            "priority": 2,
+            "status": 1,
+            "tags": []
+        },
+        {
+            "created_at": 1749568369,
+            "description": "Testing before release",
+            "due_date": 1751320800,
+            "id": 32,
+            "name": "Final test task",
+            "priority": 2,
+            "status": 1,
+            "tags": [
+                "test",
+                "final"
+            ]
+        },
+        {
+            "created_at": 1749573803,
+            "description": "",
+            "id": 33,
+            "name": "Test task after simplification",
+            "priority": 3,
             "status": 1,
             "tags": []
         }

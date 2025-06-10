@@ -1,14 +1,87 @@
 #include "Tasks.hpp"
 #include "utils.hpp"
-#include "CLI11.hpp"
 #include <iostream>
 #include <memory>
 #include <format>
+#include <vector>
+#include <string>
+#include <string_view>
+#include <algorithm>
 
 /**
  * Modern CLI application for todo task management
- * Rewritten from scratch using CLI11 best practices
+ * Custom command-line parser without external dependencies
  */
+class CommandLineParser {
+private:
+    std::vector<std::string> args_;
+    size_t current_arg_ = 0;
+
+public:
+    explicit CommandLineParser(int argc, char* argv[]) {
+        args_.reserve(argc);
+        for (int i = 0; i < argc; ++i) {
+            args_.emplace_back(argv[i]);
+        }
+    }
+
+    [[nodiscard]] bool hasMoreArgs() const noexcept {
+        return current_arg_ < args_.size();
+    }
+
+    [[nodiscard]] std::string_view peekArg() const {
+        if (current_arg_ >= args_.size()) {
+            return "";
+        }
+        return args_[current_arg_];
+    }
+
+    [[nodiscard]] std::string_view nextArg() {
+        if (current_arg_ >= args_.size()) {
+            return "";
+        }
+        return args_[current_arg_++];
+    }
+
+    [[nodiscard]] std::string_view getCommand() {
+        if (args_.size() < 2) {
+            return "";
+        }
+        current_arg_ = 2; // Skip program name and get command
+        return args_[1];
+    }
+
+    [[nodiscard]] bool isOption(std::string_view arg) const noexcept {
+        return arg.starts_with("-");
+    }
+
+    [[nodiscard]] std::string_view getOptionValue(std::string_view option) {
+        for (size_t i = current_arg_; i < args_.size(); ++i) {
+            if (args_[i] == option && i + 1 < args_.size()) {
+                return args_[i + 1];
+            }
+        }
+        return "";
+    }
+
+    [[nodiscard]] bool hasOption(std::string_view option) const {
+        return std::find(args_.begin() + 1, args_.end(), option) != args_.end();
+    }
+
+    [[nodiscard]] std::vector<std::string> getTagsFromOption(std::string_view option) {
+        std::vector<std::string> tags;
+        auto value = getOptionValue(option);
+        if (!value.empty()) {
+            tags = Utils::split(value, ',');
+        }
+        return tags;
+    }
+
+    void reset() noexcept {
+        current_arg_ = 2; // Reset to after program name and command
+    }
+};
+
 class TodoApplication {
 private:
     std::unique_ptr<Tasks> tasks_;
@@ -20,19 +93,135 @@ private:
         bool quiet = false;
     } config_;
 
-    // Command handlers
-    void handleVersionCommand() {
-        std::cout << "To-Do List Manager v2.0.0 Enhanced Edition\n";
-        std::cout << "Built with C++20/23 and CLI11\n";
-        std::cout << "Copyright (c) 2024 - Task Management System\n";
+    void printUsage() const {
+        std::cout << Utils::BOLD << "📋 To-Do List Manager v2.0 - Enhanced Edition" << Utils::RESET << "\n\n";
+
+        std::cout << Utils::CYAN << "USAGE:" << Utils::RESET << "\n";
+        std::cout << "  todo <command> [options] [arguments]\n\n";
+
+        std::cout << Utils::CYAN << "GLOBAL OPTIONS:" << Utils::RESET << "\n";
+        std::cout << "  --data-file <path>    Specify custom data file path\n";
+        std::cout << "  -v, --verbose         Enable detailed output\n";
+        std::cout << "  -q, --quiet          Suppress non-essential output\n";
+        std::cout << "  --version            Show version information\n";
+        std::cout << "  -h, --help           Show this help message\n\n";
+
+        std::cout << Utils::CYAN << "COMMANDS:" << Utils::RESET << "\n";
+        std::cout << "  ✅ add <name>                     Create a new task\n";
+        std::cout << "     Options: -s|--status <status>, -p|--priority <priority>\n";
+        std::cout << "              -d|--description <text>, --due <date>\n";
+        std::cout << "              -t|--tags <tag1,tag2,...>\n\n";
+
+        std::cout << "  📋 list [filter]                  Display tasks (aliases: ls)\n";
+        std::cout << "     Filters: todo, inprogress, completed, low, medium, high, overdue\n\n";
+
+        std::cout << "  🔄 update <id> <name> <status> <priority>  Modify existing task\n\n";
+
+        std::cout << "  🗑️  remove <id>                   Delete a task (aliases: rm, delete)\n\n";
+
+        std::cout << "  🔍 search <query>                 Find tasks (aliases: find)\n\n";
+
+        std::cout << "  📖 detail <id>                    Show task details (aliases: show, info)\n\n";
+
+        std::cout << "  ✅ complete <id>                  Mark task as completed (aliases: done)\n\n";
+
+        std::cout << "  🏷️  tag <id> <tag>                Add tag to task\n\n";
+
+        std::cout << "  🏷️❌ untag <id> <tag>             Remove tag from task\n\n";
+
+        std::cout << "  📅 due <id> <date>                Set due date (aliases: deadline)\n\n";
+
+        std::cout << "  📊 stats                          Show statistics (aliases: statistics)\n\n";
+
+        std::cout << "  ⚠️  overdue                       Show overdue tasks\n\n";        std::cout << Utils::CYAN << "EXAMPLES:" << Utils::RESET << "\n";
+        std::cout << "  todo add \"Buy groceries\" --priority high --due 2025-12-31\n";
+        std::cout << "  todo add \"Write report\" -p medium -d \"Quarterly analysis\" -t work,urgent\n";
+        std::cout << "  todo list completed\n";
+        std::cout << "  todo search \"grocery\"\n";
+        std::cout << "  todo complete 1\n";
+        std::cout << "  todo tag 2 urgent\n\n";
+
+        std::cout << Utils::CYAN << "VALID VALUES:" << Utils::RESET << "\n";
+        std::cout << "  Status: todo, inprogress, completed\n";
+        std::cout << "  Priority: low, medium, high\n";
+        std::cout << "  Date format: YYYY-MM-DD (e.g., 2025-12-31)\n";
     }
 
-    void handleAddCommand(const std::string& name,
-        const std::string& status_str = "todo",
-        const std::string& priority_str = "low",
-        const std::string& description = "",
-        const std::string& due_date_str = "",
-        const std::vector<std::string>& tags = {}) {
+    void printVersion() const {
+        std::cout << "To-Do List Manager v2.0.0 Enhanced Edition\n";
+        std::cout << "Built with C++20/23 (No external dependencies)\n";
+        std::cout << "Copyright (c) 2025 - Task Management System\n";
+    }
+
+    void parseGlobalOptions(CommandLineParser& parser) {
+        if (parser.hasOption("--data-file")) {
+            auto dataFile = parser.getOptionValue("--data-file");
+            if (!dataFile.empty()) {
+                config_.data_file = dataFile;
+                tasks_ = std::make_unique<Tasks>(config_.data_file);
+            }
+        }
+
+        config_.verbose = parser.hasOption("-v") || parser.hasOption("--verbose");
+        config_.quiet = parser.hasOption("-q") || parser.hasOption("--quiet");
+    }
+
+    // Helper method to get option value with fallback
+    std::string getOptionValueWithFallback(CommandLineParser& parser,
+        std::string_view short_opt,
+        std::string_view long_opt = "") {
+        auto value = parser.getOptionValue(short_opt);
+        if (value.empty() && !long_opt.empty()) {
+            value = parser.getOptionValue(long_opt);
+        }
+        return std::string{ value };
+    }
+
+    // Helper method to parse and validate task ID
+    std::optional<int> parseTaskId(CommandLineParser& parser, std::string_view command_name) {
+        if (!parser.hasMoreArgs()) {
+            std::cout << Utils::RED << "Error: Task ID is required" << Utils::RESET << std::endl;
+            std::cout << "Usage: todo " << command_name << " <id> ..." << std::endl;
+            return std::nullopt;
+        }
+
+        auto id_str = parser.nextArg();
+        if (!Utils::isNumber(id_str)) {
+            std::cout << Utils::RED << "Error: Invalid task ID" << Utils::RESET << std::endl;
+            return std::nullopt;
+        }
+
+        return std::stoi(std::string{ id_str });
+    }
+
+    // Command handlers
+    void handleAddCommand(CommandLineParser& parser) {
+        parser.reset();
+
+        if (!parser.hasMoreArgs()) {
+            std::cout << Utils::RED << "Error: Task name is required" << Utils::RESET << std::endl;
+            std::cout << "Usage: todo add <name> [options]" << std::endl;
+            return;
+        }
+
+        std::string name{ parser.nextArg() };
+
+        // Parse options with simplified helper
+        std::string status_str = getOptionValueWithFallback(parser, "-s", "--status");
+        if (status_str.empty()) status_str = "todo";
+
+        std::string priority_str = getOptionValueWithFallback(parser, "-p", "--priority");
+        if (priority_str.empty()) priority_str = "low";
+
+        std::string description = getOptionValueWithFallback(parser, "-d", "--description");
+        std::string due_date_str = getOptionValueWithFallback(parser, "--due");
+
+        std::vector<std::string> tags;
+        std::string tags_str = getOptionValueWithFallback(parser, "-t", "--tags");
+        if (!tags_str.empty()) {
+            tags = Utils::split(tags_str, ',');
+        }
+
         try {
             if (!config_.quiet) {
                 std::cout << Utils::CYAN << "Adding new task..." << Utils::RESET << std::endl;
@@ -68,7 +257,17 @@ private:
         }
     }
 
-    void handleListCommand(const std::string& filter = "") {
+    void handleListCommand(CommandLineParser& parser) {
+        parser.reset();
+        std::string filter;
+
+        if (parser.hasMoreArgs()) {
+            auto next = parser.peekArg();
+            if (!parser.isOption(next)) {
+                filter = parser.nextArg();
+            }
+        }
+
         try {
             if (!config_.quiet) {
                 std::cout << Utils::CYAN << "Listing tasks..." << Utils::RESET << std::endl;
@@ -108,19 +307,39 @@ private:
         }
     }
 
-    void handleUpdateCommand(int id,
-        const std::string& name,
-        const std::string& status_str,
-        const std::string& priority_str) {
+    void handleUpdateCommand(CommandLineParser& parser) {
+        parser.reset();
+
+        auto id = parseTaskId(parser, "update");
+        if (!id) return;
+
+        if (!parser.hasMoreArgs()) {
+            std::cout << Utils::RED << "Error: Task name is required" << Utils::RESET << std::endl;
+            return;
+        }
+        std::string name{ parser.nextArg() };
+
+        if (!parser.hasMoreArgs()) {
+            std::cout << Utils::RED << "Error: Status is required" << Utils::RESET << std::endl;
+            return;
+        }
+        std::string status_str{ parser.nextArg() };
+
+        if (!parser.hasMoreArgs()) {
+            std::cout << Utils::RED << "Error: Priority is required" << Utils::RESET << std::endl;
+            return;
+        }
+        std::string priority_str{ parser.nextArg() };
+
         try {
             if (!config_.quiet) {
-                std::cout << Utils::CYAN << "Updating task " << id << "..." << Utils::RESET << std::endl;
+                std::cout << Utils::CYAN << "Updating task " << *id << "..." << Utils::RESET << std::endl;
             }
 
             TaskStatus status = Utils::parseTaskStatus(status_str);
             TaskPriority priority = Utils::parseTaskPriority(priority_str);
 
-            auto result = tasks_->updateTask(id, name, status, priority);
+            auto result = tasks_->updateTask(*id, name, status, priority);
 
             if (result.success) {
                 std::cout << Utils::GREEN << "✓ " << result.message << Utils::RESET << std::endl;
@@ -134,13 +353,18 @@ private:
         }
     }
 
-    void handleRemoveCommand(int id) {
+    void handleRemoveCommand(CommandLineParser& parser) {
+        parser.reset();
+
+        auto id = parseTaskId(parser, "remove");
+        if (!id) return;
+
         try {
             if (!config_.quiet) {
-                std::cout << Utils::CYAN << "Removing task " << id << "..." << Utils::RESET << std::endl;
+                std::cout << Utils::CYAN << "Removing task " << *id << "..." << Utils::RESET << std::endl;
             }
 
-            auto result = tasks_->removeTask(id);
+            auto result = tasks_->removeTask(*id);
 
             if (result.success) {
                 std::cout << Utils::GREEN << "✓ " << result.message << Utils::RESET << std::endl;
@@ -154,7 +378,17 @@ private:
         }
     }
 
-    void handleSearchCommand(const std::string& query) {
+    void handleSearchCommand(CommandLineParser& parser) {
+        parser.reset();
+
+        if (!parser.hasMoreArgs()) {
+            std::cout << Utils::RED << "Error: Search query is required" << Utils::RESET << std::endl;
+            std::cout << "Usage: todo search <query>" << std::endl;
+            return;
+        }
+
+        std::string query{ parser.nextArg() };
+
         try {
             if (!config_.quiet) {
                 std::cout << Utils::CYAN << "Searching for: \"" << query << "\"..." << Utils::RESET << std::endl;
@@ -174,7 +408,22 @@ private:
         }
     }
 
-    void handleDetailCommand(int id) {
+    void handleDetailCommand(CommandLineParser& parser) {
+        parser.reset();
+
+        if (!parser.hasMoreArgs()) {
+            std::cout << Utils::RED << "Error: Task ID is required" << Utils::RESET << std::endl;
+            std::cout << "Usage: todo detail <id>" << std::endl;
+            return;
+        }
+
+        auto id_str = parser.nextArg();
+        if (!Utils::isNumber(id_str)) {
+            std::cout << Utils::RED << "Error: Invalid task ID" << Utils::RESET << std::endl;
+            return;
+        }
+        int id = std::stoi(std::string{ id_str });
+
         try {
             tasks_->showTaskDetails(id);
         }
@@ -183,47 +432,79 @@ private:
         }
     }
 
-    void handleCompleteCommand(int id) {
+    // Helper method to execute task operations
+    template<typename Operation>
+    void executeTaskOperation(int id, std::string_view operation_name, Operation&& op) {
         try {
             if (!config_.quiet) {
-                std::cout << Utils::CYAN << "Marking task " << id << " as completed..." << Utils::RESET << std::endl;
+                std::cout << Utils::CYAN << operation_name << " task " << id << "..." << Utils::RESET << std::endl;
             }
 
             if (auto task = tasks_->findTask(id)) {
-                task->markCompleted();
+                op(task);
                 tasks_->save();
-                std::cout << Utils::GREEN << "✓ Task marked as completed!" << Utils::RESET << std::endl;
+                std::cout << Utils::GREEN << "✓ Operation completed successfully!" << Utils::RESET << std::endl;
             }
             else {
                 std::cout << Utils::RED << "✗ Task with ID " << id << " not found!" << Utils::RESET << std::endl;
             }
         }
         catch (const std::exception& e) {
-            std::cout << Utils::RED << "✗ Failed to complete task: " << e.what() << Utils::RESET << std::endl;
+            std::cout << Utils::RED << "✗ Failed to " << operation_name << " task: " << e.what() << Utils::RESET << std::endl;
         }
     }
 
-    void handleTagCommand(int id, const std::string& tag) {
-        try {
-            if (!config_.quiet) {
-                std::cout << Utils::CYAN << "Adding tag \"" << tag << "\" to task " << id << "..." << Utils::RESET << std::endl;
-            }
+    void handleCompleteCommand(CommandLineParser& parser) {
+        parser.reset();
 
-            if (auto task = tasks_->findTask(id)) {
-                task->addTag(tag);
-                tasks_->save();
-                std::cout << Utils::GREEN << "✓ Tag added successfully!" << Utils::RESET << std::endl;
-            }
-            else {
-                std::cout << Utils::RED << "✗ Task with ID " << id << " not found!" << Utils::RESET << std::endl;
-            }
-        }
-        catch (const std::exception& e) {
-            std::cout << Utils::RED << "✗ Failed to add tag: " << e.what() << Utils::RESET << std::endl;
-        }
+        auto id = parseTaskId(parser, "complete");
+        if (!id) return;
+
+        executeTaskOperation(*id, "Marking as completed", [](Task* task) {
+            task->markCompleted();
+            });
     }
 
-    void handleUntagCommand(int id, const std::string& tag) {
+    void handleTagCommand(CommandLineParser& parser) {
+        parser.reset();
+
+        auto id = parseTaskId(parser, "tag");
+        if (!id) return;
+
+        if (!parser.hasMoreArgs()) {
+            std::cout << Utils::RED << "Error: Tag is required" << Utils::RESET << std::endl;
+            std::cout << "Usage: todo tag <id> <tag>" << std::endl;
+            return;
+        }
+        std::string tag{ parser.nextArg() };
+
+        executeTaskOperation(*id, std::format("Adding tag \"{}\" to", tag), [&tag](Task* task) {
+            task->addTag(tag);
+            });
+    }
+
+    void handleUntagCommand(CommandLineParser& parser) {
+        parser.reset();
+
+        if (!parser.hasMoreArgs()) {
+            std::cout << Utils::RED << "Error: Task ID is required" << Utils::RESET << std::endl;
+            std::cout << "Usage: todo untag <id> <tag>" << std::endl;
+            return;
+        }
+
+        auto id_str = parser.nextArg();
+        if (!Utils::isNumber(id_str)) {
+            std::cout << Utils::RED << "Error: Invalid task ID" << Utils::RESET << std::endl;
+            return;
+        }
+        int id = std::stoi(std::string{ id_str });
+
+        if (!parser.hasMoreArgs()) {
+            std::cout << Utils::RED << "Error: Tag is required" << Utils::RESET << std::endl;
+            return;
+        }
+        std::string tag{ parser.nextArg() };
+
         try {
             if (!config_.quiet) {
                 std::cout << Utils::CYAN << "Removing tag \"" << tag << "\" from task " << id << "..." << Utils::RESET << std::endl;
@@ -243,7 +524,28 @@ private:
         }
     }
 
-    void handleDueDateCommand(int id, const std::string& date_str) {
+    void handleDueDateCommand(CommandLineParser& parser) {
+        parser.reset();
+
+        if (!parser.hasMoreArgs()) {
+            std::cout << Utils::RED << "Error: Task ID is required" << Utils::RESET << std::endl;
+            std::cout << "Usage: todo due <id> <date>" << std::endl;
+            return;
+        }
+
+        auto id_str = parser.nextArg();
+        if (!Utils::isNumber(id_str)) {
+            std::cout << Utils::RED << "Error: Invalid task ID" << Utils::RESET << std::endl;
+            return;
+        }
+        int id = std::stoi(std::string{ id_str });
+
+        if (!parser.hasMoreArgs()) {
+            std::cout << Utils::RED << "Error: Date is required" << Utils::RESET << std::endl;
+            return;
+        }
+        std::string date_str{ parser.nextArg() };
+
         try {
             if (!config_.quiet) {
                 std::cout << Utils::CYAN << "Setting due date for task " << id << "..." << Utils::RESET << std::endl;
@@ -293,274 +595,75 @@ public:
     }
 
     int run(int argc, char* argv[]) {
-        // Create the main CLI app with enhanced description
-        CLI::App app{ "📋 To-Do List Manager v2.0 - Enhanced Edition" };
+        CommandLineParser parser(argc, argv);
 
-        // Enhanced app description
-        app.description("\n🎯 A powerful, modern task management system built with C++20/23\n"
-            "   Efficiently organize, track, and manage your tasks with advanced features\n"
-            "   including priorities, due dates, tags, and comprehensive search capabilities.\n");
-
-        // Set up global options with enhanced descriptions
-        app.add_option("--data-file", config_.data_file,
-            "📁 Specify custom data file path (default: data/data.json)")
-            ->type_name("PATH")
-            ->check(CLI::ExistingPath | CLI::NonexistentPath)
-            ->group("Configuration");
-
-        app.add_flag("-v,--verbose", config_.verbose,
-            "🔍 Enable detailed output for debugging")
-            ->group("Output Control");
-
-        app.add_flag("-q,--quiet", config_.quiet,
-            "🤫 Suppress non-essential output (minimal mode)")
-            ->group("Output Control");
-
-        // Enhanced version information
-        app.set_version_flag("--version",
-            "📌 To-Do List Manager v2.0.0 Enhanced Edition\n"
-            "   Built with C++20/23 and CLI11\n"
-            "   Copyright © 2024 - Modern Task Management System",
-            "Show detailed version information");
-
-        // Enhanced footer with comprehensive examples and usage patterns
-        app.footer("\n📚 COMPREHENSIVE EXAMPLES:\n"
-            "  ┌─ Basic Task Management\n"
-            "  │  todo add \"Buy groceries\" --priority high --due 2024-12-31\n"
-            "  │  todo add \"Write report\" -p medium -d \"Quarterly analysis\" -t work,urgent\n"
-            "  │  todo complete 1\n"
-            "  │  todo update 2 \"Updated task name\" inprogress medium\n"
-            "  │  todo remove 3\n"
-            "  │\n"
-            "  ┌─ Viewing and Filtering\n"
-            "  │  todo list                    # Show all tasks\n"
-            "  │  todo list completed          # Show only completed tasks\n"
-            "  │  todo list high              # Show high priority tasks\n"
-            "  │  todo overdue                # Show overdue tasks\n"
-            "  │  todo stats                  # Task statistics\n"
-            "  │\n"
-            "  ┌─ Search and Details\n"
-            "  │  todo search \"grocery\"        # Find tasks containing 'grocery'\n"
-            "  │  todo detail 5               # Show detailed info for task 5\n"
-            "  │\n"
-            "  ┌─ Tags and Due Dates\n"
-            "  │  todo tag 1 urgent           # Add 'urgent' tag to task 1\n"
-            "  │  todo untag 1 urgent         # Remove 'urgent' tag from task 1\n"
-            "  │  todo due 2 2024-12-25       # Set due date for task 2\n"
-            "\n"
-            "💡 TIPS:\n"
-            "   • Use quotes for task names with spaces\n"
-            "   • Date format: YYYY-MM-DD (e.g., 2024-12-31)\n"
-            "   • Valid priorities: low, medium, high\n"
-            "   • Valid statuses: todo, inprogress, completed\n"
-            "   • Multiple tags: -t tag1,tag2,tag3\n"
-            "\n"
-            "🆘 For detailed help on any command: todo <command> --help\n"
-            "📖 For help on all commands: todo --help-all\n");
-
-        // Configure enhanced help formatting
-        app.set_help_all_flag("--help-all", "📖 Show comprehensive help for all commands");
-
-        // Set custom help formatter for better appearance
-        app.get_formatter()->column_width(35);
-
-        // Require at least one subcommand or show help
-        app.require_subcommand(1);
-
-        // ✅ ADD command - Create new tasks
-        auto* add_cmd = app.add_subcommand("add", "✅ Create a new task with optional properties");
-        add_cmd->group("Task Management");
-
-        // Declare variables outside the scope block to ensure proper lifetime
-        std::string add_name, add_status = "todo", add_priority = "low", add_description, add_due_date;
-        std::vector<std::string> add_tags;
-
-        add_cmd->add_option("name", add_name, "📝 Task name or description")->required()
-            ->type_name("TEXT");
-        add_cmd->add_option("-s,--status", add_status, "📊 Initial task status")
-            ->check(CLI::IsMember({ "todo", "inprogress", "completed" }))
-            ->type_name("STATUS")
-            ->default_str("todo");
-        add_cmd->add_option("-p,--priority", add_priority, "⚡ Task priority level")
-            ->check(CLI::IsMember({ "low", "medium", "high" }))
-            ->type_name("PRIORITY")
-            ->default_str("low");
-        add_cmd->add_option("-d,--description", add_description, "📄 Detailed task description")
-            ->type_name("TEXT");
-        add_cmd->add_option("--due", add_due_date, "📅 Due date (YYYY-MM-DD format)")
-            ->type_name("DATE");
-        add_cmd->add_option("-t,--tags", add_tags, "🏷️  Task tags (comma-separated)")
-            ->type_name("TAG1,TAG2,...");
-
-        add_cmd->callback([this, &add_name, &add_status, &add_priority, &add_description, &add_due_date, &add_tags]() {
-            handleAddCommand(add_name, add_status, add_priority, add_description, add_due_date, add_tags);
-            });
-
-        // 📋 LIST command - Display tasks
-        auto* list_cmd = app.add_subcommand("list", "📋 Display tasks with optional filtering");
-        list_cmd->alias("ls");
-        list_cmd->group("Task Management");
-
-        std::string list_filter;
-        list_cmd->add_option("filter", list_filter, "🔍 Filter by status or priority")
-            ->check(CLI::IsMember({ "todo", "inprogress", "completed", "low", "medium", "high", "overdue" }))
-            ->type_name("FILTER");
-
-        list_cmd->callback([this, &list_filter]() {
-            handleListCommand(list_filter);
-            });
-
-        // 🔄 UPDATE command - Modify existing tasks
-        auto* update_cmd = app.add_subcommand("update", "🔄 Modify an existing task's properties");
-        update_cmd->group("Task Management");
-
-        int update_id;
-        std::string update_name, update_status, update_priority;
-
-        update_cmd->add_option("id", update_id, "🆔 Task ID to update")->required()
-            ->check(CLI::PositiveNumber)->type_name("ID");
-        update_cmd->add_option("name", update_name, "📝 New task name")->required()
-            ->type_name("TEXT");
-        update_cmd->add_option("status", update_status, "📊 New task status")->required()
-            ->check(CLI::IsMember({ "todo", "inprogress", "completed" }))
-            ->type_name("STATUS");
-        update_cmd->add_option("priority", update_priority, "⚡ New task priority")->required()
-            ->check(CLI::IsMember({ "low", "medium", "high" }))
-            ->type_name("PRIORITY");
-
-        update_cmd->callback([this, &update_id, &update_name, &update_status, &update_priority]() {
-            handleUpdateCommand(update_id, update_name, update_status, update_priority);
-            });
-
-        // 🗑️ REMOVE command - Delete tasks
-        auto* remove_cmd = app.add_subcommand("remove", "🗑️  Delete a task permanently");
-        remove_cmd->alias("rm");
-        remove_cmd->alias("delete");
-        remove_cmd->group("Task Management");
-
-        int remove_id;
-        remove_cmd->add_option("id", remove_id, "🆔 Task ID to remove")->required()
-            ->check(CLI::PositiveNumber)->type_name("ID");
-
-        remove_cmd->callback([this, &remove_id]() {
-            handleRemoveCommand(remove_id);
-            });
-
-        // 🔍 SEARCH command - Find tasks
-        auto* search_cmd = app.add_subcommand("search", "🔍 Find tasks by name, description, or tags");
-        search_cmd->alias("find");
-        search_cmd->group("Information");
-
-        std::string search_query;
-        search_cmd->add_option("query", search_query, "🎯 Search terms or keywords")->required()
-            ->type_name("TEXT");
-
-        search_cmd->callback([this, &search_query]() {
-            handleSearchCommand(search_query);
-            });
-
-        // 📖 DETAIL command - Show task information
-        auto* detail_cmd = app.add_subcommand("detail", "📖 Show comprehensive task information");
-        detail_cmd->alias("show");
-        detail_cmd->alias("info");
-        detail_cmd->group("Information");
-
-        int detail_id;
-        detail_cmd->add_option("id", detail_id, "🆔 Task ID to display")->required()
-            ->check(CLI::PositiveNumber)->type_name("ID");
-
-        detail_cmd->callback([this, &detail_id]() {
-            handleDetailCommand(detail_id);
-            });
-
-        // ✅ COMPLETE command - Mark as done
-        auto* complete_cmd = app.add_subcommand("complete", "✅ Mark a task as completed");
-        complete_cmd->alias("done");
-        complete_cmd->group("Task Management");
-
-        int complete_id;
-        complete_cmd->add_option("id", complete_id, "🆔 Task ID to complete")->required()
-            ->check(CLI::PositiveNumber)->type_name("ID");
-
-        complete_cmd->callback([this, &complete_id]() {
-            handleCompleteCommand(complete_id);
-            });
-
-        // 🏷️ TAG command - Add tags
-        auto* tag_cmd = app.add_subcommand("tag", "🏷️  Add a tag to a task for organization");
-        tag_cmd->group("Organization");
-
-        int tag_id;
-        std::string tag_name;
-        tag_cmd->add_option("id", tag_id, "🆔 Task ID to tag")->required()
-            ->check(CLI::PositiveNumber)->type_name("ID");
-        tag_cmd->add_option("tag", tag_name, "🏷️  Tag name to add")->required()
-            ->type_name("TAG");
-
-        tag_cmd->callback([this, &tag_id, &tag_name]() {
-            handleTagCommand(tag_id, tag_name);
-            });
-
-        // 🏷️❌ UNTAG command - Remove tags
-        auto* untag_cmd = app.add_subcommand("untag", "🏷️❌ Remove a tag from a task");
-        untag_cmd->group("Organization");
-
-        int untag_id;
-        std::string untag_name;
-        untag_cmd->add_option("id", untag_id, "🆔 Task ID to untag")->required()
-            ->check(CLI::PositiveNumber)->type_name("ID");
-        untag_cmd->add_option("tag", untag_name, "🏷️  Tag name to remove")->required()
-            ->type_name("TAG");
-
-        untag_cmd->callback([this, &untag_id, &untag_name]() {
-            handleUntagCommand(untag_id, untag_name);
-            });
-
-        // 📅 DUE command - Set due dates
-        auto* due_cmd = app.add_subcommand("due", "📅 Set or update task due date");
-        due_cmd->alias("deadline");
-        due_cmd->group("Organization");
-
-        int due_id;
-        std::string due_date;
-        due_cmd->add_option("id", due_id, "🆔 Task ID to set due date")->required()
-            ->check(CLI::PositiveNumber)->type_name("ID");
-        due_cmd->add_option("date", due_date, "📅 Due date (YYYY-MM-DD)")->required()
-            ->type_name("DATE");
-
-        due_cmd->callback([this, &due_id, &due_date]() {
-            handleDueDateCommand(due_id, due_date);
-            });
-
-        // 📊 STATS command - Show statistics
-        auto* stats_cmd = app.add_subcommand("stats", "📊 Display comprehensive task statistics");
-        stats_cmd->alias("statistics");
-        stats_cmd->group("Information");
-
-        stats_cmd->callback([this]() {
-            handleStatsCommand();
-            });
-
-        // ⚠️ OVERDUE command - Show overdue tasks
-        auto* overdue_cmd = app.add_subcommand("overdue", "⚠️  Show tasks that are past their due date");
-        overdue_cmd->group("Information");
-
-        overdue_cmd->callback([this]() {
-            handleOverdueCommand();
-            });
-
-        // Reload Tasks with the possibly changed data file
-        if (config_.data_file != "data/data.json") {
-            tasks_ = std::make_unique<Tasks>(config_.data_file);
-        }
-
-        // Parse and execute
-        try {
-            app.parse(argc, argv);
+        // Check for version or help
+        if (parser.hasOption("--version")) {
+            printVersion();
             return 0;
         }
-        catch (const CLI::ParseError& e) {
-            return app.exit(e);
+
+        if (parser.hasOption("-h") || parser.hasOption("--help") || argc < 2) {
+            printUsage();
+            return 0;
+        }
+
+        // Parse global options
+        parseGlobalOptions(parser);
+
+        // Get command
+        auto command = parser.getCommand();
+        if (command.empty()) {
+            std::cout << Utils::RED << "Error: No command specified" << Utils::RESET << std::endl;
+            printUsage();
+            return 1;
+        }
+
+        try {
+            // Route to appropriate command handler
+            if (command == "add") {
+                handleAddCommand(parser);
+            }
+            else if (command == "list" || command == "ls") {
+                handleListCommand(parser);
+            }
+            else if (command == "update") {
+                handleUpdateCommand(parser);
+            }
+            else if (command == "remove" || command == "rm" || command == "delete") {
+                handleRemoveCommand(parser);
+            }
+            else if (command == "search" || command == "find") {
+                handleSearchCommand(parser);
+            }
+            else if (command == "detail" || command == "show" || command == "info") {
+                handleDetailCommand(parser);
+            }
+            else if (command == "complete" || command == "done") {
+                handleCompleteCommand(parser);
+            }
+            else if (command == "tag") {
+                handleTagCommand(parser);
+            }
+            else if (command == "untag") {
+                handleUntagCommand(parser);
+            }
+            else if (command == "due" || command == "deadline") {
+                handleDueDateCommand(parser);
+            }
+            else if (command == "stats" || command == "statistics") {
+                handleStatsCommand();
+            }
+            else if (command == "overdue") {
+                handleOverdueCommand();
+            }
+            else {
+                std::cout << Utils::RED << "Error: Unknown command '" << command << "'" << Utils::RESET << std::endl;
+                std::cout << "Use 'todo --help' for available commands" << std::endl;
+                return 1;
+            }
+
+            return 0;
         }
         catch (const std::exception& e) {
             std::cerr << Utils::RED << "Unexpected error: " << e.what() << Utils::RESET << std::endl;

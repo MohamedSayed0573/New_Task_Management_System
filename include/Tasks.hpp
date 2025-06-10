@@ -66,6 +66,12 @@ private:
     void rebuildSearchIndex() const;
     [[nodiscard]] std::vector<Task*> getSortedTasks() const;
 
+    // Table display helpers
+    void printTableSeparator(int idWidth, int nameWidth, int statusWidth, int priorityWidth, int dueDateWidth) const;
+    void printTableHeader(int idWidth, int nameWidth, int statusWidth, int priorityWidth, int dueDateWidth) const;
+    void printTaskRow(const Task* task, int idWidth, int nameWidth, int statusWidth, int priorityWidth, int dueDateWidth) const;
+    std::string formatTaskName(const Task* task, int maxWidth) const;
+
 public:
     // Constructor with path validation
     explicit Tasks(std::filesystem::path dataFile = "data/data.json");

@@ -84,34 +84,29 @@ namespace Utils {
         return oss.str();
     }
 
-    std::optional<system_clock::time_point> parseDate(std::string_view dateStr) {
-        // First try flexible date parsing
-        auto flexibleResult = parseFlexibleDate(dateStr);
-        if (flexibleResult) {
-            return flexibleResult;
-        }
-
-        // Fall back to standard date formats
+    // Date parsing helper functions
+    std::optional<system_clock::time_point> tryParseStandardFormat(std::string_view dateStr, const char* format) {
         std::istringstream iss{ std::string{dateStr} };
         std::tm tm = {};
-
-        // Try YYYY-MM-DD format
-        if (iss >> std::get_time(&tm, "%Y-%m-%d")) {
+        if (iss >> std::get_time(&tm, format)) {
             return system_clock::from_time_t(std::mktime(&tm));
         }
+        return std::nullopt;
+    }
 
-        // Try DD/MM/YYYY format
-        iss.clear();
-        iss.str(std::string{ dateStr });
-        if (iss >> std::get_time(&tm, "%d/%m/%Y")) {
-            return system_clock::from_time_t(std::mktime(&tm));
+    std::optional<system_clock::time_point> parseDate(std::string_view dateStr) {
+        // First try flexible date parsing
+        if (auto result = parseFlexibleDate(dateStr)) {
+            return result;
         }
 
-        // Try MM/DD/YYYY format (American style)
-        iss.clear();
-        iss.str(std::string{ dateStr });
-        if (iss >> std::get_time(&tm, "%m/%d/%Y")) {
-            return system_clock::from_time_t(std::mktime(&tm));
+        // Try standard date formats in order of preference
+        const char* formats[] = { "%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y" };
+
+        for (const auto& format : formats) {
+            if (auto result = tryParseStandardFormat(dateStr, format)) {
+                return result;
+            }
         }
 
         return std::nullopt;
@@ -175,6 +170,15 @@ namespace Utils {
         return addDays(getToday(), 7);
     }
 
+    // Helper to calculate days in a month
+    int getDaysInMonth(int month, int year) {
+        const int daysPerMonth[] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+        if (month == 1 && ((year % 4 == 0 && year % 100 != 0) || year % 400 == 0)) {
+            return 29; // Leap year February
+        }
+        return daysPerMonth[month];
+    }
+
     std::chrono::system_clock::time_point getNextMonth() {
         auto today = getToday();
         auto time_t_today = system_clock::to_time_t(today);
@@ -188,15 +192,7 @@ namespace Utils {
         }
 
         // Handle day overflow (e.g., Jan 31 + 1 month = Feb 28/29)
-        auto daysInMonth = [](int month, int year) -> int {
-            const int daysPerMonth[] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
-            if (month == 1 && ((year % 4 == 0 && year % 100 != 0) || year % 400 == 0)) {
-                return 29; // Leap year February
-            }
-            return daysPerMonth[month];
-            };
-
-        int maxDay = daysInMonth(tm_today.tm_mon, tm_today.tm_year + 1900);
+        int maxDay = getDaysInMonth(tm_today.tm_mon, tm_today.tm_year + 1900);
         if (tm_today.tm_mday > maxDay) {
             tm_today.tm_mday = maxDay;
         }

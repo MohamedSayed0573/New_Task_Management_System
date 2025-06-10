@@ -116,31 +116,12 @@ std::vector<Task*> Tasks::getTasksByStatus(TaskStatus status) const {
     BENCHMARK("Get Tasks By Status");
 
     std::vector<Task*> results;
-    results.reserve(tasks.size() / 3); // Assume roughly 1/3 of tasks match any given status - Phase 1 optimization
+    results.reserve(tasks.size() / 3); // Assume roughly 1/3 of tasks match any given status
 
-    // Phase 2 optimization: Use parallel algorithms for large collections
-    if (tasks.size() > 1000) {
-        std::vector<Task*> all_tasks;
-        all_tasks.reserve(tasks.size());
-
-        for (const auto& task : tasks) {
-            all_tasks.push_back(task.get());
-        }
-
-        std::copy_if(std::execution::par_unseq,
-            all_tasks.begin(), all_tasks.end(),
-            std::back_inserter(results),
-            [status](const Task* task) {
-                return task->getStatus() == status;
-            });
-    }
-    else {
-        // Use serial version for small collections (avoid overhead)
-        for (const auto& task : tasks | std::views::filter([status](const auto& t) {
-            return t->getStatus() == status;
-            })) {
-            results.push_back(task.get());
-        }
+    for (const auto& task : tasks | std::views::filter([status](const auto& t) {
+        return t->getStatus() == status;
+        })) {
+        results.push_back(task.get());
     }
 
     return results;
@@ -185,58 +166,31 @@ std::vector<Task*> Tasks::getOverdueTasks() const {
 TaskStats Tasks::getStatistics() const {
     BENCHMARK("Statistics Computation");
 
-    // Phase 2 optimization: Lazy evaluation of statistics
+    // Lazy evaluation of statistics
     if (!stats_dirty_ && cached_stats_) {
         return *cached_stats_;
     }
 
     TaskStats stats{};
 
-    // Use parallel algorithms for large collections
-    if (tasks.size() > 500) {
-        std::vector<Task*> task_ptrs;
-        task_ptrs.reserve(tasks.size());
-        for (const auto& task : tasks) {
-            task_ptrs.push_back(task.get());
+    // Simple single-pass computation
+    for (const auto& task : tasks) {
+        ++stats.total;
+
+        switch (task->getStatus()) {
+        case TaskStatus::TODO: ++stats.todo; break;
+        case TaskStatus::IN_PROGRESS: ++stats.inProgress; break;
+        case TaskStatus::COMPLETED: ++stats.completed; break;
         }
 
-        // Parallel counting
-        stats.total = tasks.size();
-        stats.todo = std::count_if(std::execution::par_unseq, task_ptrs.begin(), task_ptrs.end(),
-            [](const Task* t) { return t->getStatus() == TaskStatus::TODO; });
-        stats.inProgress = std::count_if(std::execution::par_unseq, task_ptrs.begin(), task_ptrs.end(),
-            [](const Task* t) { return t->getStatus() == TaskStatus::IN_PROGRESS; });
-        stats.completed = std::count_if(std::execution::par_unseq, task_ptrs.begin(), task_ptrs.end(),
-            [](const Task* t) { return t->getStatus() == TaskStatus::COMPLETED; });
-        stats.lowPriority = std::count_if(std::execution::par_unseq, task_ptrs.begin(), task_ptrs.end(),
-            [](const Task* t) { return t->getPriority() == TaskPriority::LOW; });
-        stats.mediumPriority = std::count_if(std::execution::par_unseq, task_ptrs.begin(), task_ptrs.end(),
-            [](const Task* t) { return t->getPriority() == TaskPriority::MEDIUM; });
-        stats.highPriority = std::count_if(std::execution::par_unseq, task_ptrs.begin(), task_ptrs.end(),
-            [](const Task* t) { return t->getPriority() == TaskPriority::HIGH; });
-        stats.overdue = std::count_if(std::execution::par_unseq, task_ptrs.begin(), task_ptrs.end(),
-            [](const Task* t) { return t->isOverdue(); });
-    }
-    else {
-        // Serial computation for small collections
-        for (const auto& task : tasks) {
-            ++stats.total;
+        switch (task->getPriority()) {
+        case TaskPriority::LOW: ++stats.lowPriority; break;
+        case TaskPriority::MEDIUM: ++stats.mediumPriority; break;
+        case TaskPriority::HIGH: ++stats.highPriority; break;
+        }
 
-            switch (task->getStatus()) {
-            case TaskStatus::TODO: ++stats.todo; break;
-            case TaskStatus::IN_PROGRESS: ++stats.inProgress; break;
-            case TaskStatus::COMPLETED: ++stats.completed; break;
-            }
-
-            switch (task->getPriority()) {
-            case TaskPriority::LOW: ++stats.lowPriority; break;
-            case TaskPriority::MEDIUM: ++stats.mediumPriority; break;
-            case TaskPriority::HIGH: ++stats.highPriority; break;
-            }
-
-            if (task->isOverdue()) {
-                ++stats.overdue;
-            }
+        if (task->isOverdue()) {
+            ++stats.overdue;
         }
     }
 
@@ -268,84 +222,15 @@ void Tasks::showAllTasks() const {
     const int dueDateWidth = 15;
 
     // Table header with ASCII borders for better compatibility
-    std::cout << "+-" << std::string(idWidth, '-');
-    std::cout << "-+-" << std::string(nameWidth, '-');
-    std::cout << "-+-" << std::string(statusWidth, '-');
-    std::cout << "-+-" << std::string(priorityWidth, '-');
-    std::cout << "-+-" << std::string(dueDateWidth, '-');
-    std::cout << "-+" << std::endl;
-
-    // Header row
-    std::cout << "| " << Utils::BOLD << std::left << std::setw(idWidth) << "ID";
-    std::cout << " | " << std::left << std::setw(nameWidth) << "Task Name";
-    std::cout << " | " << std::left << std::setw(statusWidth) << "Status";
-    std::cout << " | " << std::left << std::setw(priorityWidth) << "Priority";
-    std::cout << " | " << std::left << std::setw(dueDateWidth) << "Due Date";
-    std::cout << " |" << Utils::RESET << std::endl;
-
-    // Header separator
-    std::cout << "+-" << std::string(idWidth, '-');
-    std::cout << "-+-" << std::string(nameWidth, '-');
-    std::cout << "-+-" << std::string(statusWidth, '-');
-    std::cout << "-+-" << std::string(priorityWidth, '-');
-    std::cout << "-+-" << std::string(dueDateWidth, '-');
-    std::cout << "-+" << std::endl;
+    printTableHeader(idWidth, nameWidth, statusWidth, priorityWidth, dueDateWidth);
 
     // Data rows
     for (const auto& task : sortedTasks) {
-        // Task name with truncation if too long
-        std::string taskName = task->getName();
-        std::string displayName = taskName.length() > nameWidth ?
-            taskName.substr(0, nameWidth - 3) + "..." : taskName;
-
-        // Add overdue indicator
-        if (task->isOverdue()) {
-            displayName += " [!]";
-            if (displayName.length() > nameWidth) {
-                displayName = displayName.substr(0, nameWidth - 3) + "...";
-            }
-        }
-
-        // Get status and priority strings
-        std::string statusStr = task->getStatusString();
-        std::string priorityStr = task->getPriorityString();
-
-        // Format due date consistently
-        std::string dueDateStr = task->getDueDate() ?
-            Utils::formatDate(*task->getDueDate()) : "";
-
-        // Apply colors based on status
-        std::string_view statusColor = Utils::RESET;
-        switch (task->getStatus()) {
-        case TaskStatus::TODO: statusColor = Utils::RED; break;
-        case TaskStatus::IN_PROGRESS: statusColor = Utils::YELLOW; break;
-        case TaskStatus::COMPLETED: statusColor = Utils::GREEN; break;
-        }
-
-        // Apply colors based on priority
-        std::string_view priorityColor = Utils::RESET;
-        switch (task->getPriority()) {
-        case TaskPriority::HIGH: priorityColor = Utils::RED; break;
-        case TaskPriority::MEDIUM: priorityColor = Utils::YELLOW; break;
-        case TaskPriority::LOW: priorityColor = Utils::BLUE; break;
-        }
-
-        // Display the row
-        std::cout << "| " << std::left << std::setw(idWidth) << task->getId();
-        std::cout << " | " << std::left << std::setw(nameWidth) << displayName;
-        std::cout << " | " << statusColor << std::left << std::setw(statusWidth) << statusStr << Utils::RESET;
-        std::cout << " | " << priorityColor << std::left << std::setw(priorityWidth) << priorityStr << Utils::RESET;
-        std::cout << " | " << std::left << std::setw(dueDateWidth) << dueDateStr;
-        std::cout << " |" << std::endl;
+        printTaskRow(task, idWidth, nameWidth, statusWidth, priorityWidth, dueDateWidth);
     }
 
     // Table footer
-    std::cout << "+-" << std::string(idWidth, '-');
-    std::cout << "-+-" << std::string(nameWidth, '-');
-    std::cout << "-+-" << std::string(statusWidth, '-');
-    std::cout << "-+-" << std::string(priorityWidth, '-');
-    std::cout << "-+-" << std::string(dueDateWidth, '-');
-    std::cout << "-+" << std::endl;
+    printTableSeparator(idWidth, nameWidth, statusWidth, priorityWidth, dueDateWidth);
 
     std::cout << Utils::CYAN << "📋 Total tasks: " << tasks.size() << Utils::RESET << std::endl;
 }
@@ -400,21 +285,57 @@ void Tasks::showOverdueTasks() const {
 void Tasks::showStatistics() const {
     auto stats = getStatistics();
 
-    std::cout << Utils::BOLD << "📊 Task Statistics" << Utils::RESET << std::endl;
+    std::cout << Utils::BOLD << "[STATS] Task Statistics" << Utils::RESET << std::endl;
     std::cout << "==================" << std::endl;
-    std::cout << "Total tasks: " << Utils::CYAN << stats.total << Utils::RESET << std::endl;
-    std::cout << "To-Do: " << Utils::RED << stats.todo << Utils::RESET << std::endl;
-    std::cout << "In Progress: " << Utils::YELLOW << stats.inProgress << Utils::RESET << std::endl;
-    std::cout << "Completed: " << Utils::GREEN << stats.completed << Utils::RESET << std::endl;
     std::cout << std::endl;
-    std::cout << "Priority breakdown:" << std::endl;
-    std::cout << "High: " << Utils::RED << stats.highPriority << Utils::RESET << std::endl;
-    std::cout << "Medium: " << Utils::YELLOW << stats.mediumPriority << Utils::RESET << std::endl;
-    std::cout << "Low: " << Utils::BLUE << stats.lowPriority << Utils::RESET << std::endl;
 
+    // Create a two-column table: Status on left, Priority on right
+    const int leftColWidth = 25;
+    const int rightColWidth = 25;
+
+    // Table header
+    std::cout << "+" << std::string(leftColWidth, '-');
+    std::cout << "+" << std::string(rightColWidth, '-') << "+" << std::endl;
+
+    std::cout << "|" << Utils::BOLD << " Task Status" << Utils::RESET;
+    std::cout << std::string(leftColWidth - 12, ' ') << "|";
+    std::cout << Utils::BOLD << " Priority Breakdown" << Utils::RESET;
+    std::cout << std::string(rightColWidth - 19, ' ') << "|" << std::endl;
+
+    // Header separator
+    std::cout << "+" << std::string(leftColWidth, '-');
+    std::cout << "+" << std::string(rightColWidth, '-') << "+" << std::endl;
+
+    // Data rows
+    // Row 1: To-Do | High priority  
+    std::cout << "| To-Do: " << Utils::RED << stats.todo << Utils::RESET;
+    std::cout << std::string(leftColWidth - 8 - std::to_string(stats.todo).length(), ' ') << "|";
+    std::cout << " High: " << Utils::RED << stats.highPriority << Utils::RESET;
+    std::cout << std::string(rightColWidth - 7 - std::to_string(stats.highPriority).length(), ' ') << "|" << std::endl;
+
+    // Row 2: In Progress | Medium priority
+    std::cout << "| In Progress: " << Utils::YELLOW << stats.inProgress << Utils::RESET;
+    std::cout << std::string(leftColWidth - 14 - std::to_string(stats.inProgress).length(), ' ') << "|";
+    std::cout << " Medium: " << Utils::YELLOW << stats.mediumPriority << Utils::RESET;
+    std::cout << std::string(rightColWidth - 9 - std::to_string(stats.mediumPriority).length(), ' ') << "|" << std::endl;
+
+    // Row 3: Completed | Low priority
+    std::cout << "| Completed: " << Utils::GREEN << stats.completed << Utils::RESET;
+    std::cout << std::string(leftColWidth - 12 - std::to_string(stats.completed).length(), ' ') << "|";
+    std::cout << " Low: " << Utils::BLUE << stats.lowPriority << Utils::RESET;
+    std::cout << std::string(rightColWidth - 6 - std::to_string(stats.lowPriority).length(), ' ') << "|" << std::endl;
+
+    // Table footer
+    std::cout << "+" << std::string(leftColWidth, '-');
+    std::cout << "+" << std::string(rightColWidth, '-') << "+" << std::endl;
+
+    // Total tasks summary
+    std::cout << std::endl;
+    std::cout << Utils::CYAN << "📋 Total tasks: " << stats.total << Utils::RESET << std::endl;
+
+    // Overdue tasks warning (if any)
     if (stats.overdue > 0) {
-        std::cout << std::endl;
-        std::cout << Utils::RED << "[!] Overdue tasks: " << stats.overdue << Utils::RESET << std::endl;
+        std::cout << Utils::RED << "⚠️  Overdue tasks: " << stats.overdue << Utils::RESET << std::endl;
     }
 }
 
@@ -503,84 +424,15 @@ void Tasks::displayTaskList(const std::vector<Task*>& taskList, std::string_view
     const int dueDateWidth = 15;
 
     // Table header with ASCII borders for better compatibility
-    std::cout << "+-" << std::string(idWidth, '-');
-    std::cout << "-+-" << std::string(nameWidth, '-');
-    std::cout << "-+-" << std::string(statusWidth, '-');
-    std::cout << "-+-" << std::string(priorityWidth, '-');
-    std::cout << "-+-" << std::string(dueDateWidth, '-');
-    std::cout << "-+" << std::endl;
-
-    // Header row
-    std::cout << "| " << Utils::BOLD << std::left << std::setw(idWidth) << "ID";
-    std::cout << " | " << std::left << std::setw(nameWidth) << "Task Name";
-    std::cout << " | " << std::left << std::setw(statusWidth) << "Status";
-    std::cout << " | " << std::left << std::setw(priorityWidth) << "Priority";
-    std::cout << " | " << std::left << std::setw(dueDateWidth) << "Due Date";
-    std::cout << " |" << Utils::RESET << std::endl;
-
-    // Header separator
-    std::cout << "+-" << std::string(idWidth, '-');
-    std::cout << "-+-" << std::string(nameWidth, '-');
-    std::cout << "-+-" << std::string(statusWidth, '-');
-    std::cout << "-+-" << std::string(priorityWidth, '-');
-    std::cout << "-+-" << std::string(dueDateWidth, '-');
-    std::cout << "-+" << std::endl;
+    printTableHeader(idWidth, nameWidth, statusWidth, priorityWidth, dueDateWidth);
 
     // Data rows
     for (const auto& task : taskList) {
-        // Task name with truncation if too long
-        std::string taskName = task->getName();
-        std::string displayName = taskName.length() > nameWidth ?
-            taskName.substr(0, nameWidth - 3) + "..." : taskName;
-
-        // Add overdue indicator
-        if (task->isOverdue()) {
-            displayName += " [!]";
-            if (displayName.length() > nameWidth) {
-                displayName = displayName.substr(0, nameWidth - 3) + "...";
-            }
-        }
-
-        // Get status and priority strings
-        std::string statusStr = task->getStatusString();
-        std::string priorityStr = task->getPriorityString();
-
-        // Format due date consistently
-        std::string dueDateStr = task->getDueDate() ?
-            Utils::formatDate(*task->getDueDate()) : "";
-
-        // Apply colors based on status
-        std::string_view statusColor = Utils::RESET;
-        switch (task->getStatus()) {
-        case TaskStatus::TODO: statusColor = Utils::RED; break;
-        case TaskStatus::IN_PROGRESS: statusColor = Utils::YELLOW; break;
-        case TaskStatus::COMPLETED: statusColor = Utils::GREEN; break;
-        }
-
-        // Apply colors based on priority
-        std::string_view priorityColor = Utils::RESET;
-        switch (task->getPriority()) {
-        case TaskPriority::HIGH: priorityColor = Utils::RED; break;
-        case TaskPriority::MEDIUM: priorityColor = Utils::YELLOW; break;
-        case TaskPriority::LOW: priorityColor = Utils::BLUE; break;
-        }
-
-        // Display the row
-        std::cout << "| " << std::left << std::setw(idWidth) << task->getId();
-        std::cout << " | " << std::left << std::setw(nameWidth) << displayName;
-        std::cout << " | " << statusColor << std::left << std::setw(statusWidth) << statusStr << Utils::RESET;
-        std::cout << " | " << priorityColor << std::left << std::setw(priorityWidth) << priorityStr << Utils::RESET;
-        std::cout << " | " << std::left << std::setw(dueDateWidth) << dueDateStr;
-        std::cout << " |" << std::endl;
+        printTaskRow(task, idWidth, nameWidth, statusWidth, priorityWidth, dueDateWidth);
     }
 
     // Table footer
-    std::cout << "+-" << std::string(idWidth, '-');
-    std::cout << "-+-" << std::string(nameWidth, '-');
-    std::cout << "-+-" << std::string(statusWidth, '-');
-    std::cout << "-+-" << std::string(priorityWidth, '-');
-    std::cout << "-+-" << std::string(dueDateWidth, '-');
-    std::cout << "-+" << std::endl;
+    printTableSeparator(idWidth, nameWidth, statusWidth, priorityWidth, dueDateWidth);
 
     std::cout << Utils::CYAN << "📊 Count: " << taskList.size() << Utils::RESET << std::endl;
 }
@@ -708,4 +560,62 @@ void Tasks::waitForSave() const {
     if (save_future_.valid()) {
         save_future_.wait();
     }
+}
+
+// Table display helper methods
+void Tasks::printTableSeparator(int idWidth, int nameWidth, int statusWidth, int priorityWidth, int dueDateWidth) const {
+    std::cout << "+-" << std::string(idWidth, '-');
+    std::cout << "-+-" << std::string(nameWidth, '-');
+    std::cout << "-+-" << std::string(statusWidth, '-');
+    std::cout << "-+-" << std::string(priorityWidth, '-');
+    std::cout << "-+-" << std::string(dueDateWidth, '-');
+    std::cout << "-+" << std::endl;
+}
+
+void Tasks::printTableHeader(int idWidth, int nameWidth, int statusWidth, int priorityWidth, int dueDateWidth) const {
+    printTableSeparator(idWidth, nameWidth, statusWidth, priorityWidth, dueDateWidth);
+
+    std::cout << "| " << Utils::BOLD << std::left << std::setw(idWidth) << "ID";
+    std::cout << " | " << std::left << std::setw(nameWidth) << "Task Name";
+    std::cout << " | " << std::left << std::setw(statusWidth) << "Status";
+    std::cout << " | " << std::left << std::setw(priorityWidth) << "Priority";
+    std::cout << " | " << std::left << std::setw(dueDateWidth) << "Due Date";
+    std::cout << " |" << Utils::RESET << std::endl;
+
+    printTableSeparator(idWidth, nameWidth, statusWidth, priorityWidth, dueDateWidth);
+}
+
+std::string Tasks::formatTaskName(const Task* task, int maxWidth) const {
+    std::string taskName = task->getName();
+    std::string displayName = taskName.length() > static_cast<size_t>(maxWidth) ?
+        taskName.substr(0, maxWidth - 3) + "..." : taskName;
+
+    // Add overdue indicator
+    if (task->isOverdue()) {
+        displayName += " [!]";
+        if (displayName.length() > static_cast<size_t>(maxWidth)) {
+            displayName = displayName.substr(0, maxWidth - 3) + "...";
+        }
+    }
+
+    return displayName;
+}
+
+void Tasks::printTaskRow(const Task* task, int idWidth, int nameWidth, int statusWidth, int priorityWidth, int dueDateWidth) const {
+    std::string displayName = formatTaskName(task, nameWidth);
+    std::string statusStr = task->getStatusString();
+    std::string priorityStr = task->getPriorityString();
+    std::string dueDateStr = task->getDueDate() ? Utils::formatDate(*task->getDueDate()) : "";
+
+    // Get colors
+    std::string_view statusColor = Utils::getStatusColor(task->getStatus());
+    std::string_view priorityColor = Utils::getPriorityColor(task->getPriority());
+
+    // Display the row
+    std::cout << "| " << std::left << std::setw(idWidth) << task->getId();
+    std::cout << " | " << std::left << std::setw(nameWidth) << displayName;
+    std::cout << " | " << statusColor << std::left << std::setw(statusWidth) << statusStr << Utils::RESET;
+    std::cout << " | " << priorityColor << std::left << std::setw(priorityWidth) << priorityStr << Utils::RESET;
+    std::cout << " | " << std::left << std::setw(dueDateWidth) << dueDateStr;
+    std::cout << " |" << std::endl;
 }

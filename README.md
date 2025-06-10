@@ -1,24 +1,41 @@
-# To-Do List Manager ✅ COMPLETED
+# 📋 To-Do List Manager v2.0 - Enhanced Edition
 
-A command-line to-do list application written in C++20 that allows users to manage tasks with different priorities and statuses. The application uses JSON files for data persistence and provides a clean command-line interface for task management.
+A modern, high-performance command-line task management application built with C++20/23. Features a custom CLI parser with no external dependencies, comprehensive task management capabilities, and optimized performance.
 
-**✨ Status: Fully implemented and tested!**
+**✨ Status: Production Ready - CLI11-Free Version**
 
-## Quick Start
+## 🚀 Features
 
+- ✅ **Zero Dependencies**: Custom CLI parser, no external libraries required
+- 🔍 **Advanced Search**: Fast task search with indexed lookups
+- 📊 **Rich Statistics**: Comprehensive task analytics and progress tracking
+- 🏷️ **Tag System**: Organize tasks with flexible tagging
+- 📅 **Due Dates**: Set and track task deadlines with overdue detection
+- 🎯 **Priority Management**: Three-level priority system (low, medium, high)
+- 💾 **JSON Persistence**: Reliable data storage with automatic backups
+- 🌈 **Colorized Output**: Beautiful terminal interface with emoji support
+- ⚡ **Performance Optimized**: Parallel processing for large task collections
+
+## 🛠️ Installation
+
+### Quick Install (Recommended)
 ```bash
-# Clone or navigate to the project directory
-cd todo-app
+# Build and install system-wide (requires sudo)
+sudo ./install.sh
 
+# Or install for current user only
+./install.sh
+```
+
+### Manual Installation
+```bash
 # Build the application
 make
 
-# Run the demo
-./demo.sh
-
-# Or start using it right away
-./todo add "My first task" 1 2
-./todo show
+# Copy to your preferred location
+sudo cp todo /usr/local/bin/
+# or
+cp todo ~/.local/bin/
 ```
 
 ## Features
